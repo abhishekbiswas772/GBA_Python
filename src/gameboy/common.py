@@ -1,0 +1,47 @@
+NINTENDO_LOGO = bytes.fromhex(
+    "CEED6666CC0D000B03730083000C000D"
+    "0008111F8889000EDCCC6EE6DDDDD999"
+    "BBBB67636E0EECCCDDDC999FBBB9333E"
+)
+
+
+CARTRIDGE_TYPES = {
+    0x00: "ROM ONLY",
+    0x01: "MBC1", 
+    0x02: "MBC1+RAM", 
+    0x03: "MBC1+RAM+BATTERY",
+    0x05: "MBC2", 
+    0x06: "MBC2+BATTERY",
+    0x08: "ROM+RAM", 
+    0x09: "ROM+RAM+BATTERY",
+    0x0B: "MMM01", 
+    0x0C: "MMM01+RAM", 
+    0x0D: "MMM01+RAM+BATTERY",
+    0x0F: "MBC3+TIMER+BATTERY", 
+    0x10: "MBC3+TIMER+RAM+BATTERY",
+    0x11: "MBC3", 
+    0x12: "MBC3+RAM", 
+    0x13: "MBC3+RAM+BATTERY",
+    0x19: "MBC5", 
+    0x1A: "MBC5+RAM", 
+    0x1B: "MBC5+RAM+BATTERY",
+    0x1C: "MBC5+RUMBLE", 
+    0x1D: "MBC5+RUMBLE+RAM", 
+    0x1E: "MBC5+RUMBLE+RAM+BATTERY",
+    0x20: "MBC6", 
+    0x22: "MBC7+SENSOR+RUMBLE+RAM+BATTERY",
+    0xFC: "POCKET CAMERA", 
+    0xFD: "BANDAI TAMA5", 
+    0xFE: "HuC3", 
+    0xFF: "HuC1+RAM+BATTERY",
+}
+
+
+RAM_SIZES = {
+    0x00: 0,
+    0x01: 0, 
+    0x02: 8,
+    0x03: 32, 
+    0x04: 128,
+    0x05: 64
+}
