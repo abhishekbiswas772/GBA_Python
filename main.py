@@ -17,9 +17,12 @@ def main() -> None:
     ap.add_argument("--headless", action="store_true", help="run without a window")
     ap.add_argument("--scale", default=3, type=int, help="window scale factor")
     ap.add_argument("--mute", action="store_true", help="disable audio output")
+    ap.add_argument("--dmg", action="store_true",
+                    help="force original Game Boy (DMG) mode for CGB-enhanced ROMs")
     args = ap.parse_args()
 
-    gb = GameBoy(args.rom)
+    gb = GameBoy(args.rom, cgb=False if args.dmg else None)
+    print(f"[{'CGB' if gb.cgb else 'DMG'} mode]")
     print(gb.cart)
     t0 = time.time()
 

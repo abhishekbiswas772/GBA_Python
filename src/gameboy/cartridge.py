@@ -30,6 +30,11 @@ class CartridgeHeader:
     ram_size: int 
     logo_ok: bool
     checksum_ok: bool
+    cgb_flag: int = 0              # 0x0143: 0x80 = CGB-enhanced, 0xC0 = CGB-only
+
+    @property
+    def supports_cgb(self) -> bool:
+        return bool(self.cgb_flag & 0x80)
 
     @property
     def type_name(self) -> str:
@@ -56,14 +61,15 @@ def parse_header(rom: bytes) -> CartridgeHeader:
     else:
         rom_size = len(rom)
     return CartridgeHeader(
-        title= rom[0x0134: 0x0144].split(b"\x00")[0].decode(
+        title= rom[0x0134: 0x0143 if rom[0x0143] & 0x80 else 0x0144].split(b"\x00")[0].decode(
             "ascii", errors="replace"
         ).strip(),
         cart_type=rom[0x0147],
         rom_size=rom_size,
         ram_size=RAM_SIZES.get(rom[0x0149], 0) * 1024,
         logo_ok=rom[0x0104: 0x0134] == NINTENDO_LOGO,
-        checksum_ok= checksum == rom[0x014D]
+        checksum_ok= checksum == rom[0x014D],
+        cgb_flag=rom[0x0143],
     )
 
 

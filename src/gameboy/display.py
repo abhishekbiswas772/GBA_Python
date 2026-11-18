@@ -30,6 +30,11 @@ def framebuffer_surface(fb, tables=None, palette=DMG_PALETTE):
     return pygame.image.frombytes(framebuffer_rgb(fb, tables, palette), (WIDTH, HEIGHT), "RGB")
 
 
+def cgb_surface(ppu):
+    """CGB mode: the PPU already produced RGB888 (RGB555 expanded, no colour correction)."""
+    return pygame.image.frombytes(bytes(ppu.rgb), (WIDTH, HEIGHT), "RGB")
+
+
 KEYMAP = {
     pygame.K_RIGHT: "right",
     pygame.K_LEFT: "left",
@@ -213,7 +218,10 @@ class Display:
                 self.gb.run_frame()
                 if self.audio:
                     self.audio.pump()
-                surf = framebuffer_surface(self.gb.ppu.framebuffer, self.tables, self.palette)
+                if self.gb.cgb:
+                    surf = cgb_surface(self.gb.ppu)
+                else:
+                    surf = framebuffer_surface(self.gb.ppu.framebuffer, self.tables, self.palette)
                 pygame.transform.scale(surf.convert(), self.screen.get_size(), self.screen)
                 pygame.display.flip()
                 self.frames += 1

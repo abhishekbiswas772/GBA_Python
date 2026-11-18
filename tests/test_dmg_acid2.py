@@ -52,3 +52,44 @@ def test_pokemon_smoke():
         gb.steps()
     pygame.image.save(framebuffer_surface(gb.ppu.framebuffer, palette=GRAY_PALETTE),
                       str(POKEMON_PNG))
+
+
+CGB_ACID_ROM = ROM_DIR / "cgb-acid2.gbc"
+CGB_ACID_REF = ROM_DIR / "cgb-acid2-reference.png"
+CGB_ACID_ACTUAL = ROM_DIR / "cgb-acid2-actual.png"
+CGB_GAME_PNG = ROM_DIR / "cgb-game-smoke-actual.png"
+
+
+@pytest.mark.slow
+def test_cgb_acid2_pixel_perfect():
+    ref = pygame.image.tobytes(pygame.image.load(str(CGB_ACID_REF)), "RGB")
+    gb = GameBoy(CGB_ACID_ROM)
+    assert gb.cgb
+    prev = None
+    for _ in range(120):                    # until the LCD is on and the frame is stable
+        gb.run_frame()
+        cur = bytes(gb.ppu.rgb)
+        if cur == prev and gb.ppu.lcdc & 0x80:
+            break
+        prev = cur
+    pygame.image.save(pygame.image.frombytes(cur, (160, 144), "RGB"), str(CGB_ACID_ACTUAL))
+    # compare at RGB555 precision: independent of the 5->8 bit expansion formula
+    bad = sum(1 for a, b in zip(cur, ref) if a >> 3 != b >> 3)
+    assert bad == 0, f"{bad} mismatching channel values; see {CGB_ACID_ACTUAL} vs {CGB_ACID_REF}"
+
+
+@pytest.mark.slow
+def test_cgb_game_smoke(tmp_path):
+    import shutil
+    roms = sorted((Path(__file__).parent.parent / "src" / "rom").glob("*.gbc"))
+    if not roms:
+        pytest.skip("no .gbc ROM in src/rom/")
+    rom = tmp_path / roms[0].name               # private copy: never touch the real .sav
+    shutil.copy(roms[0], rom)
+    gb = GameBoy(rom)
+    assert gb.cgb
+    for _ in range(300):
+        gb.run_frame()
+    pygame.image.save(pygame.image.frombytes(bytes(gb.ppu.rgb), (160, 144), "RGB"),
+                      str(CGB_GAME_PNG))
+    assert len(set(gb.ppu.framebuffer)) > 1, "screen is a single colour after 300 frames"

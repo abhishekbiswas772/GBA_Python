@@ -48,13 +48,14 @@ def build_ppu():
     return mmu, ppu
 
 
-def run_serial(rom_path: str | Path, budget: int = CYCLE_BUDGET):
+def run_serial(rom_path: str | Path, budget: int = CYCLE_BUDGET, cgb: bool | None = False):
     """Run a ROM until it prints Passed/Failed on serial.
 
+    cgb=False forces DMG mode (the Blargg ROMs are CGB-flagged), True forces CGB.
     Returns (text, cycles, wall_seconds, done).
     """
     from src.gameboy.gameboy import GameBoy
-    gb = GameBoy(rom_path)
+    gb = GameBoy(rom_path, cgb=cgb)
     t0 = time.perf_counter()
     steps = gb.steps
     serial = gb.mmu.serial_output

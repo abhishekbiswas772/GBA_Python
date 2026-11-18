@@ -215,6 +215,7 @@ class CPU:
                 if y == 2:
                     def stop():
                         self.fetch8()
+                        self.mmu.switch_speed()                # CGB: KEY1 armed -> toggle speed
                         self.mmu.write(0xFF04, 0)              # STOP resets DIV
                         return 4
                     return stop

@@ -25,35 +25,40 @@ ROMS = [
 ]
 
 
+MODES = (("DMG", False), ("CGB", True))
+
+
 def main() -> int:
     passed = failed = skipped = 0
     total_cycles = 0
     total_wall = 0.0
 
-    for rel, skip in ROMS:
-        name = rel.as_posix()
-        if skip:
-            print(f"SKIP  {name:<42} {skip}")
-            skipped += 1
-            continue
-        text, cycles, wall, done = run_serial(ROOT / rel,
-                                              budget=CYCLE_BUDGET * (3 if rel.name == "cpu_instrs.gb" else 1))
-        total_cycles += cycles
-        total_wall += wall
-        if not done:
-            result = "TIMEOUT"
-        elif "Passed" in text:
-            result = "PASS"
-        else:
-            result = "FAIL"
-        if result == "PASS":
-            passed += 1
-        else:
-            failed += 1
-        speed = cycles / wall / REAL_HARDWARE_HZ * 100 if wall > 0 else 0.0
-        print(f"{result:<5} {name:<42} {wall:6.1f}s  {speed:5.0f}% realtime")
-        if result != "PASS":
-            print(f"      serial: {text!r}")
+    for mode, cgb in MODES:
+        for rel, skip in ROMS:
+            name = rel.as_posix()
+            if skip:
+                if not cgb:
+                    print(f"SKIP  {'':3} {name:<42} {skip}")
+                    skipped += 1
+                continue
+            text, cycles, wall, done = run_serial(
+                ROOT / rel, budget=CYCLE_BUDGET * (3 if rel.name == "cpu_instrs.gb" else 1), cgb=cgb)
+            total_cycles += cycles
+            total_wall += wall
+            if not done:
+                result = "TIMEOUT"
+            elif "Passed" in text:
+                result = "PASS"
+            else:
+                result = "FAIL"
+            if result == "PASS":
+                passed += 1
+            else:
+                failed += 1
+            speed = cycles / wall / REAL_HARDWARE_HZ * 100 if wall > 0 else 0.0
+            print(f"{result:<5} {mode} {name:<42} {wall:6.1f}s  {speed:5.0f}% realtime")
+            if result != "PASS":
+                print(f"      serial: {text!r}")
 
     speed = total_cycles / total_wall / REAL_HARDWARE_HZ * 100 if total_wall > 0 else 0.0
     print(f"{passed} passed, {failed} failed, {skipped} skipped "
