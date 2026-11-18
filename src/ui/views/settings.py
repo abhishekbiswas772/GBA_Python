@@ -274,6 +274,26 @@ def _paths(app: "App") -> list[ft.Control]:
             app.rescan()
             app.render()
 
+    async def pick_save_dir(e) -> None:
+        if app.is_web:
+            app.toast("Changing the save folder needs the desktop app.")
+            return
+        path = await ft.FilePicker().get_directory_path(dialog_title="Choose a save folder")
+        if path:
+            s.save_dir = path
+            if s.apply_save_dir() is None:
+                app.toast("Can't use that folder; saves stay where they were.")
+                s.save_dir = ""
+                s.apply_save_dir()
+            s.save()
+            app.render()
+
+    def reset_save_dir(e) -> None:
+        s.save_dir = ""
+        s.apply_save_dir()
+        s.save()
+        app.render()
+
     def remove(path: str) -> None:
         s.rom_dirs.remove(path)
         s.save()
@@ -286,7 +306,7 @@ def _paths(app: "App") -> list[ft.Control]:
         rows.append(c.card(ft.Row([
             c.icon(ft.Icons.FOLDER_OPEN, t.muted, 18),
             ft.Column([c.mono(d, size=13, color=t.text),
-                       c.text("Scanned for .gb, .gbc and .gba files" if exists else "Folder not found",
+                       c.text("Scanned for .gb, .gbc, .gba and .nes files" if exists else "Folder not found",
                               size=12, color=t.muted)], spacing=2, tight=True, expand=True),
             c.icon_button(ft.Icons.CLOSE, lambda e, p=d: remove(p), t, "Remove folder"),
         ], spacing=12), t, padding=c.pad(14, 10), radius=12))
@@ -294,11 +314,23 @@ def _paths(app: "App") -> list[ft.Control]:
         rows.append(c.text("No folders yet.", color=t.muted))
     return [
         ft.Column([c.heading("Paths & saves", t, 28),
-                   c.text("Battery saves (.sav) are written next to each ROM.", color=t.muted)], spacing=6),
+                   c.text("Battery saves get one folder per game: saves / console / game / game.sav.",
+                          color=t.muted)], spacing=6),
         c.eyebrow("ROM folders", t),
         ft.Column(rows, spacing=10),
         ft.Row([c.button("Add folder", add_folder, t, variant="primary", icon_name=ft.Icons.ADD),
                 c.button("Open app data", lambda e: app.open_folder(data_dir()), t)], spacing=10, wrap=True),
+        c.eyebrow("Save folder", t),
+        c.card(ft.Row([
+            c.icon(ft.Icons.SAVE_OUTLINED, t.muted, 18),
+            ft.Column([c.mono(str(s.save_folder()), size=13, color=t.text),
+                       c.text("Custom folder" if s.save_dir else "Default folder", size=12, color=t.muted)],
+                      spacing=2, tight=True, expand=True),
+        ], spacing=12), t, padding=c.pad(14, 10), radius=12),
+        ft.Row([c.button("Change save folder", pick_save_dir, t, icon_name=ft.Icons.DRIVE_FOLDER_UPLOAD),
+                c.button("Open save folder", lambda e: app.open_folder(s.apply_save_dir() or s.save_folder()), t)]
+               + ([c.button("Use default", reset_save_dir, t, variant="ghost")] if s.save_dir else []),
+               spacing=10, wrap=True),
         c.text(f"Settings, thumbnails and moments: {data_dir()}", size=12, color=t.muted, selectable=True),
     ]
 

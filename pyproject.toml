@@ -1,8 +1,10 @@
 [project]
 name = "gba-python"
 version = "0.1.0"
-description = "Game Boy, Game Boy Color and Game Boy Advance emulator in pure Python, with a Flet desktop app"
+description = "Game Boy, Game Boy Color, Game Boy Advance and NES emulator in pure Python, with a Flet desktop app"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Abhishek Biswas", email = "abhishekbiswas772@gmail.com" }
 ]

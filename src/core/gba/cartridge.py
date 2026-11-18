@@ -10,6 +10,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.core.saves import sav_path_for
+
 from src.core.gba.rtc import RTC
 from src.core.gba.common import (
     RTC_SIGNATURE,
@@ -226,7 +228,7 @@ class Cartridge:
         self.save = make_save(self.save_kind)
         self.rtc = RTC() if RTC_SIGNATURE in self.rom else None
         self.path = path
-        self.sav_path = path.with_suffix(".sav") if path is not None else None
+        self.sav_path = sav_path_for(path, "gba") if path is not None else None
         if self.save is not None and self.sav_path is not None and self.sav_path.exists():
             self._load(self.sav_path.read_bytes())
 
@@ -253,8 +255,13 @@ class Cartridge:
         if s is None or self.sav_path is None or not s.dirty:
             return False
         tmp = self.sav_path.with_suffix(".sav.tmp")
-        tmp.write_bytes(bytes(s.data))
-        os.replace(tmp, self.sav_path)
+        try:                           # atomic: a crash mid-write never truncates the .sav
+            self.sav_path.parent.mkdir(parents=True, exist_ok=True)     # per-game save folder
+            tmp.write_bytes(bytes(s.data))
+            os.replace(tmp, self.sav_path)
+        except OSError as e:
+            print(f"[warning: could not write {self.sav_path.name}: {e}]")
+            return False
         s.dirty = False
         return True
 

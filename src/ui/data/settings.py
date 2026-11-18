@@ -86,6 +86,14 @@ def data_dir() -> Path:
     return path
 
 
+def default_save_dir() -> Path:
+    """Battery saves: ./saves next to main.py when running from source, the app
+    data folder's saves/ when packaged."""
+    if os.environ.get("FLET_APP_STORAGE_DATA"):
+        return data_dir() / "saves"
+    return Path(__file__).resolve().parents[3] / "saves"
+
+
 @dataclass
 class Settings:
     theme: str = "daylight"
@@ -100,6 +108,7 @@ class Settings:
     replay_buffer: bool = True
     rom_dirs: list[str] = field(default_factory=lambda: [str(Path.home() / "Games" / "ROMs")])
     extra_roms: list[str] = field(default_factory=list)
+    save_dir: str = ""               # battery saves; "" = default_save_dir()
     # one keyboard layout per system: {"GB": {button: [primary, secondary]}, "GBC": ..., "GBA": ...}
     keyboards: dict[str, dict[str, list[str]]] = field(default_factory=default_keyboards)
     hotkeys: dict[str, str] = field(default_factory=lambda: {k: v[1] for k, v in HOTKEYS.items()})
@@ -163,6 +172,15 @@ class Settings:
                     keys = [k if isinstance(k, str) else "" for k in keys][:2]
                     out[sysname][b] = keys + [""] * (2 - len(keys))
         return out
+
+    def save_folder(self) -> Path:
+        """Folder battery saves go to (one subfolder per core, then per game)."""
+        return Path(self.save_dir).expanduser() if self.save_dir else default_save_dir()
+
+    def apply_save_dir(self) -> Path | None:
+        """Make sure the save folder exists and point every core at it."""
+        from src.core.saves import set_save_dir
+        return set_save_dir(self.save_folder())
 
     def keyboard_for(self, system: str) -> dict[str, list[str]]:
         """Key layout used while playing `system` ("GB", "GBC", "GBA" or "NES")."""

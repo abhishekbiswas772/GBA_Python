@@ -4,6 +4,8 @@ import struct
 import time
 from dataclasses import dataclass
 from pathlib import Path
+
+from src.core.saves import sav_path_for
 from src.core.gameboy.common import (
     NINTENDO_LOGO, CARTRIDGE_TYPES, RAM_SIZES,
     BATTERY_TYPES, RTC_TYPES,
@@ -139,7 +141,8 @@ class Cartridge:
         self.rom = data
         self.ram = bytearray(self._ram_size())
         self.ram_dirty = False
-        self.sav_path = Path(path).with_suffix(".sav") if path is not None else None
+        self.sav_path = (sav_path_for(path, "gbc" if self.header.supports_cgb else "gb")
+                         if path is not None else None)
         self.has_battery = self.header.cart_type in BATTERY_TYPES
         self._load_save()
 
@@ -174,7 +177,7 @@ class Cartridge:
             self.ram_dirty = True
 
     def save_ram(self, force: bool = False) -> bool:
-        """Write external RAM (and RTC state) to <rom>.sav. Returns True if written."""
+        """Write external RAM (and RTC state) to the .sav file. Returns True if written."""
         if not (self.has_battery and self.sav_path):
             return False
         if not (self.ram_dirty or force):
@@ -182,6 +185,7 @@ class Cartridge:
         extra = self.rtc.to_bytes() if self.rtc is not None else b""
         tmp = self.sav_path.with_name(self.sav_path.name + ".tmp")
         try:                           # atomic: a crash mid-write never truncates the .sav
+            self.sav_path.parent.mkdir(parents=True, exist_ok=True)     # per-game save folder
             tmp.write_bytes(bytes(self.ram) + extra)
             os.replace(tmp, self.sav_path)
         except OSError as e:

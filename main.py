@@ -44,6 +44,16 @@ class _CoreSink:
         self.target.release(button.lower())
 
 
+def ensure_save_dir() -> Path | None:
+    """Create the save folder (settings, else ./saves) and send every core's .sav there."""
+    try:
+        from src.ui.data.settings import Settings
+        return Settings.load().apply_save_dir()
+    except ImportError:                       # UI package missing: plain ./saves
+        from src.core.saves import set_save_dir
+        return set_save_dir(ROOT / "saves")
+
+
 def ensure_rom_dir() -> Path:
     """The ./rom library folder (created with gb / gb_color / gba / nes subfolders if missing)."""
     created = not ROM_DIR.is_dir()
@@ -209,6 +219,7 @@ def _play_nes(args, headless: bool) -> None:
 
 def cmd_play(args, headless: bool | None = None) -> None:
     args.rom = _check_rom(args.rom)
+    ensure_save_dir()
     if headless is None:
         headless = bool(args.headless or args.frames is not None or args.doctor
                         or args.steps is not None)

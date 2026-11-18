@@ -6,6 +6,7 @@ Thanks for wanting to help. This project emulates the Game Boy, Game Boy Color, 
 
 - **No copyrighted ROMs or BIOS files.** Never commit, attach or link commercial games or a Nintendo BIOS. That covers issues and PRs too. The `rom/` folder is git-ignored for exactly this reason.
 - **Pure Python cores.** `src/core/` uses only the standard library. No C extensions, no NumPy in the hot paths. Speed comes from technique; see "Performance" below.
+- **Licence.** By contributing you agree that your work is released under the project's [MIT License](LICENSE).
 - **Be kind.** Assume good intent, keep reviews about the code, and help newcomers.
 
 ## Setup

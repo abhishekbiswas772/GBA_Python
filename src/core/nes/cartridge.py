@@ -19,6 +19,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from src.core.saves import sav_path_for
+
 from src.core.nes.common import (
     MIRROR_FOUR, MIRROR_HORIZONTAL, MIRROR_SINGLE0, MIRROR_SINGLE1, MIRROR_VERTICAL,
 )
@@ -320,7 +322,7 @@ class Cartridge:
         self.prg_ram_writable = True
         self.ram_dirty = False
         self.path = path
-        self.sav_path = path.with_suffix(".sav") if (path is not None and h.battery) else None
+        self.sav_path = sav_path_for(path, "nes") if (path is not None and h.battery) else None
         if h.trainer:
             self.prg_ram[0x1000:0x1200] = data[16:16 + 512]
         cls = MAPPERS.get(h.mapper)
@@ -349,11 +351,12 @@ class Cartridge:
         self.prg_ram[:len(data[:0x2000])] = data[:0x2000]
 
     def save_ram(self) -> bool:
-        """Write battery-backed PRG RAM to <rom>.sav. Returns True if written."""
+        """Write battery-backed PRG RAM to the .sav file. Returns True if written."""
         if self.sav_path is None or not self.ram_dirty:
             return False
         tmp = self.sav_path.with_name(self.sav_path.name + ".tmp")
         try:
+            self.sav_path.parent.mkdir(parents=True, exist_ok=True)     # per-game save folder
             tmp.write_bytes(bytes(self.prg_ram))
             os.replace(tmp, self.sav_path)
         except OSError as e:

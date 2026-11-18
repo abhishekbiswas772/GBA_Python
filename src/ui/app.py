@@ -224,10 +224,12 @@ async def main(page: ft.Page) -> None:
         page.window.min_width = 380
         page.window.min_height = 600
         page.window.icon = str(ASSETS_DIR / ("icon.ico" if sys.platform.startswith("win") else "icon.png"))
+        page.window.maximized = True          # open filling the screen (1440x900 when restored)
 
     # Splash while settings load and ROM folders are scanned (can take a moment on big libraries).
     t0 = time.perf_counter()
     settings = Settings.load()
+    settings.apply_save_dir()                 # create saves/ and route every core's .sav there
     t = THEMES.get(settings.theme, THEMES["daylight"])
     loader = splash.RetroLoader(t)
     page.bgcolor = t.bg

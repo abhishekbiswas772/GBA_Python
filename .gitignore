@@ -31,3 +31,6 @@ tests/roms/other/window-screenshot.png
 prof
 *.prof
 rom/
+
+# battery saves: saves/<gb|gbc|gba|nes>/<game>/<game>.sav
+saves/

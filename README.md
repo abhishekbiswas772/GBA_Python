@@ -15,6 +15,7 @@
   <img src="https://img.shields.io/badge/python-3.13+-3776AB?logo=python&logoColor=white" alt="Python 3.13+" />
   <img src="https://img.shields.io/badge/pure-python-FFD43B?logo=python&logoColor=black" alt="Pure Python" />
   <img src="https://img.shields.io/badge/platforms-windows%20%C2%B7%20linux-3D55D6" alt="Windows and Linux" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-F2A65A" alt="MIT license" /></a>
   <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-9FD356" alt="PRs welcome" /></a>
 </p>
 
@@ -60,7 +61,7 @@
   - Four themes.
   - Each system has its own key layout.
   - Gamepads and touch controls are supported.
-- **Battery saves that just work.** They are written atomically next to the ROM, about every 10 seconds and again when you quit.
+- **Battery saves that just work.** Each game gets its own folder under `saves/`. Saves are written atomically, about every 10 seconds and again when you quit.
 
 ---
 
@@ -84,6 +85,18 @@ rom/
 ```
 
 You can also point **Settings → Paths & Saves** at a folder you already have. `~/Games/ROMs` is picked up automatically.
+
+Saves are kept in `saves/`, which is created on first start and is git-ignored. There is one folder per console, then one per game:
+
+```text
+saves/
+├── gb/    My Game/My Game.sav
+├── gbc/   …
+├── gba/   …
+└── nes/   …
+```
+
+You can move it under **Settings → Paths & Saves → Change save folder**. An old `.sav` sitting next to a ROM is copied in automatically the first time that game loads; the original is never deleted.
 
 <details>
 <summary><b>More ways to launch</b></summary>
@@ -242,6 +255,7 @@ src/ui/                  Flet app (library, player, settings, themes)
 tests/roms/              open test ROMs: blargg, Acid2, jsmolka, nes-test-roms
 docs/                    README media and make_media.py
 rom/                     yours, git-ignored
+saves/                   battery saves, one folder per console and game (git-ignored)
 ```
 
 Settings, thumbnails and screenshots are stored in `~/.gba_python` while you develop, and in the app storage directory once packaged.
@@ -294,7 +308,10 @@ Push a tag like `v0.2.0` and GitHub Actions builds both apps and publishes them 
 
 Bug reports, test-ROM results and pull requests are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the setup, the project conventions, and how to add a mapper or a test.
 
-## ⚖️ Legal
+## ⚖️ License and legal
+
+The code is released under the [MIT License](LICENSE).
+
 
 This project does not include, distribute or link to copyrighted ROMs or a Nintendo BIOS. Play games you own. The GBA core boots from a built-in high-level BIOS; a real BIOS dump is optional and never shipped.
 
