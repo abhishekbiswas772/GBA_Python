@@ -20,7 +20,7 @@ ROMS = [
     (Path("tests/roms/cpu_instrs/11-op a,(hl).gb"), None),
     (Path("tests/roms/other/instr_timing.gb"), None),
     (Path("tests/roms/other/cpu_instrs.gb"), "needs MBC1 (phase 7)"),
-    (Path("tests/roms/other/dmg-acid2.gb"), "needs PPU (phase 5)"),
+    (Path("tests/roms/other/dmg-acid2.gb"), "no serial output - tested via pytest --slow"),
 ]
 
 

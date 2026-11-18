@@ -33,6 +33,19 @@ def build(rom: bytes):
     return cpu, mmu, timer
 
 
+def build_ppu():
+    from src.gameboy.cartridge import Cartridge
+    from src.gameboy.mmu import MMU
+    from src.gameboy.ppu import PPU
+    from src.gameboy.timer import Timer
+    mmu = MMU(Cartridge(make_rom()))
+    timer = Timer(mmu)
+    mmu.timer = timer
+    ppu = PPU(mmu)
+    mmu.ppu = ppu
+    return mmu, ppu
+
+
 def run_serial(rom_path: str | Path, budget: int = CYCLE_BUDGET):
     """Run a ROM until it prints Passed/Failed on serial.
 

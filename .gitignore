@@ -14,3 +14,7 @@ src/rom/
 
 # Cartridge save files
 *.sav
+
+# Test run artifacts (keep only *-reference.png)
+tests/roms/other/*-actual.png
+tests/roms/other/window-screenshot.png

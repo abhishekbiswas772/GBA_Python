@@ -1,6 +1,7 @@
 from src.gameboy.cartridge import Cartridge
 from src.gameboy.cpu import CPU
 from src.gameboy.mmu import MMU
+from src.gameboy.ppu import PPU
 from src.gameboy.timer import Timer
 from pathlib import Path
 
@@ -10,14 +11,23 @@ class GameBoy:
         self.mmu = MMU(self.cart)
         self.timer = Timer(self.mmu)
         self.mmu.timer = self.timer
+        self.ppu = PPU(self.mmu)
+        self.mmu.ppu = self.ppu
         self.cpu = CPU(self.mmu)
         self.total_cycles = 0
 
     def steps(self) -> int:
         cycles = self.cpu.step()
         self.timer.tick(cycles)
+        self.ppu.step(cycles)
         self.total_cycles += cycles
         return cycles
+
+    def run_frame(self) -> None:
+        target = self.ppu.frame_count + 1
+        while self.ppu.frame_count < target:
+            self.steps()
+        self.ppu.frame_ready = False
 
 
     def run(self, max_steps = None, doctor_log = None, stop_on_serial = ("Passed", "Failed")):
