@@ -1,4 +1,4 @@
-_FREQ_BITS = (9, 3, 5, 7)
+from src.gameboy.common import TIMER_FREQ_BITS as _FREQ_BITS
 
 
 class Timer:

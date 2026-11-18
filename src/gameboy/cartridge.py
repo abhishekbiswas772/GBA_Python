@@ -1,26 +1,13 @@
-"""Cartridge ROM/RAM + mapper (MBC) support and battery saves.
-
-Mapper is chosen from header byte 0x0147: `Cartridge(rom)` / `Cartridge.from_file`
-returns ROM-only, MBC1, MBC2, MBC3 or MBC5 as appropriate.
-
-Battery saves: cartridges with battery persist external RAM to `<rom>.sav`
-(same stem as the ROM, .sav suffix). Format: raw SRAM bytes, followed for
-MBC3 timer carts (0x0F/0x10) by a 48-byte VBA-style RTC block:
-5 x 4-byte LE current regs (sec, min, hr, day-low, day-high),
-5 x 4-byte LE latched regs, 8-byte LE unix timestamp of the save.
-RTC counters advance lazily from the wall clock (real time passes while the
-emulator is off). RTC registers are writable only while halted (day-high bit 6),
-except day-high itself; day carry is bit 7.
-"""
 from __future__ import annotations
-
 import os
 import struct
 import time
 from dataclasses import dataclass
 from pathlib import Path
-
-from src.gameboy.common import NINTENDO_LOGO, CARTRIDGE_TYPES, RAM_SIZES
+from src.gameboy.common import (
+    NINTENDO_LOGO, CARTRIDGE_TYPES, RAM_SIZES,
+    BATTERY_TYPES, RTC_TYPES,
+)
 
 @dataclass
 class CartridgeHeader:
@@ -65,10 +52,6 @@ def parse_header(rom: bytes) -> CartridgeHeader:
         logo_ok=rom[0x0104: 0x0134] == NINTENDO_LOGO,
         checksum_ok= checksum == rom[0x014D]
     )
-
-
-BATTERY_TYPES = {0x03, 0x06, 0x09, 0x0D, 0x0F, 0x10, 0x13, 0x1B, 0x1E, 0xFF}
-RTC_TYPES = {0x0F, 0x10}
 
 
 class RTC:

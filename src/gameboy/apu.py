@@ -1,21 +1,9 @@
-"""DMG APU: 2 pulse (CH1 + sweep), wave, noise; 512 Hz frame sequencer; stereo mixer."""
 from array import array
-
-CYCLES_PER_SECOND = 4_194_304
-SAMPLE_RATE = 44_100
-FS_PERIOD = 8_192
-DUTY = (0b00000001, 0b10000001, 0b10000111, 0b01111110)
-SCALE = 32_767 // (2 * 15 * 4 * 8)      # full -60..+60 swing * master vol 8 fits after DC block
-HP = 0.001                              # DC blocker coefficient (~7 Hz)
-
-# register file 0xFF10-0xFF26: write masks (stored bits) / read-as-one masks
-# NRx4: only bit 6 (length enable) reads back; trigger + freq-high read as 1
-_W = bytes((0x7F, 0xFF, 0xFF, 0xFF, 0x40, 0x00, 0xFF, 0xFF, 0xFF, 0x40,
-            0x80, 0xFF, 0x60, 0xFF, 0x40, 0x00, 0xFF, 0xFF, 0xFF, 0x40,
-            0xFF, 0xFF, 0x80))
-_R = bytes((0x80, 0x3F, 0x00, 0xFF, 0xBF, 0xFF, 0x3F, 0x00, 0xFF, 0xBF,
-            0x7F, 0xFF, 0x9F, 0xFF, 0xBF, 0xFF, 0xFF, 0x00, 0x00, 0xBF,
-            0x00, 0x00, 0x70))
+from src.gameboy.common import (
+    CYCLES_PER_SECOND, SAMPLE_RATE, FS_PERIOD,
+    DUTY, SCALE, HP,
+    APU_WRITE_MASK as _W, APU_READ_OR as _R,
+)
 
 
 class PulseChannel:

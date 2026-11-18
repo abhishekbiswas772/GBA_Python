@@ -1,9 +1,6 @@
 import time
 import pygame
-from src.gameboy.ppu import WIDTH, HEIGHT
-
-DMG_PALETTE = ((0xE0, 0xF8, 0xD0), (0x88, 0xC0, 0x70), (0x34, 0x68, 0x56), (0x08, 0x18, 0x20))
-GRAY_PALETTE = ((0xFF, 0xFF, 0xFF), (0xAA, 0xAA, 0xAA), (0x55, 0x55, 0x55), (0x00, 0x00, 0x00))
+from src.gameboy.common import WIDTH, HEIGHT, SAMPLE_RATE, DMG_PALETTE, GRAY_PALETTE
 
 
 def rgb_tables(palette=DMG_PALETTE):
@@ -88,7 +85,7 @@ class AudioOut:
     if the device wants a different format/rate (allowed_changes=0: no pitch
     shift on 48 kHz-only devices)."""
 
-    RATE = 44100
+    RATE = SAMPLE_RATE
     BYTES_PER_FRAME = 4                       # S16 stereo
 
     def __init__(self, apu, target: float = 0.05, max_latency: float = 0.25):
