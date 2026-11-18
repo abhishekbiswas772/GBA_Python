@@ -18,19 +18,36 @@ class CPU:
         self.ime = False            
         self.ime_pending = False    
         self.halted = False
+        self.halt_bug = False
 
         self.ops = [self._decode(op) for op in range(256)]        
         self.cb_ops = [self._decode_cb(op) for op in range(256)]  
 
     def step(self) -> int:
         if self.halted:
-            if self.mmu.read(0xFFFF) & self.mmu.read(0xFF0F) & 0x1F:
+            if self.mmu.ie & self.mmu.io[0x0F] & 0x1F:
                 self.halted = False
             else:
                 return 4
 
+        if self.ime:
+            pending = self.mmu.ie & self.mmu.io[0x0F] & 0x1F
+            if pending:
+                self.ime = False
+                self.halt_bug = False
+                bit = pending & -pending
+                self.mmu.io[0x0F] &= ~bit & 0xFF
+                self.push16(self.pc)
+                self.pc = 0x40 + (bit.bit_length() - 1) * 8
+                return 20
+
         enable_ime_after = self.ime_pending
-        opcode = self.fetch8()
+        if self.halt_bug:
+            self.halt_bug = False
+            opcode = self.mmu.read(self.pc)
+        else:
+            opcode = self.mmu.read(self.pc)
+            self.pc = (self.pc + 1) & 0xFFFF
         cycles = self.ops[opcode]()
         if enable_ime_after and self.ime_pending:
             self.ime = True
@@ -40,7 +57,10 @@ class CPU:
 
     def fetch8(self) -> int:
         value = self.mmu.read(self.pc)
-        self.pc = (self.pc + 1) & 0xFFFF
+        if self.halt_bug:
+            self.halt_bug = False
+        else:
+            self.pc = (self.pc + 1) & 0xFFFF
         return value
 
     def fetch16(self) -> int:
@@ -87,9 +107,14 @@ class CPU:
 
     def set_flags(self, z, n, h, c) -> None:
         f = self.f
-        for flag, val in ((FLAG_Z, z), (FLAG_N, n), (FLAG_H, h), (FLAG_C, c)):
-            if val is not None:
-                f = (f | flag) if val else (f & ~flag)
+        if z is not None:
+            f = (f | FLAG_Z) if z else (f & ~FLAG_Z)
+        if n is not None:
+            f = (f | FLAG_N) if n else (f & ~FLAG_N)
+        if h is not None:
+            f = (f | FLAG_H) if h else (f & ~FLAG_H)
+        if c is not None:
+            f = (f | FLAG_C) if c else (f & ~FLAG_C)
         self.f = f & 0xF0
 
     def flag(self, mask: int) -> bool:
@@ -160,7 +185,10 @@ class CPU:
         if x == 1:
             if op == 0x76:
                 def halt():
-                    self.halted = True
+                    if not self.ime and not self.ime_pending and self.mmu.ie & self.mmu.io[0x0F] & 0x1F:
+                        self.halt_bug = True
+                    else:
+                        self.halted = True
                     return 4
                 return halt
 

@@ -10,6 +10,7 @@ class MMU:
         self.io = bytearray(0x80)
         self.hram = bytearray(0x7F)
         self.ie = 0x00
+        self.timer = None
 
         self.serial_output = []
 
@@ -69,12 +70,20 @@ class MMU:
         self.write(addr, value & 0xFF)
         self.write(addr + 1, (value >> 8) & 0xFF)
 
+    def request_interrupt(self, bit: int) -> None:
+        self.io[0x0F] |= bit
+
     def read_io(self, addr: int) -> int:
+        if 0xFF04 <= addr <= 0xFF07 and self.timer is not None:
+            return self.timer.read(addr)
         if addr == 0xFF44:
             return 0x90
         return self.io[addr - 0xFF00]
 
     def write_io(self, addr: int, value: int) -> None:
+        if 0xFF04 <= addr <= 0xFF07 and self.timer is not None:
+            self.timer.write(addr, value)
+            return
         self.io[addr - 0xFF00] = value 
         if addr == 0xFF02 and value == 0x81:
             self.serial_output.append(chr(self.io[0x01]))

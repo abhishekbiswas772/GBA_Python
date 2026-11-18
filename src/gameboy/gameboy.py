@@ -1,17 +1,21 @@
 from src.gameboy.cartridge import Cartridge
 from src.gameboy.cpu import CPU
 from src.gameboy.mmu import MMU
+from src.gameboy.timer import Timer
 from pathlib import Path
 
 class GameBoy:
     def __init__(self, rom_path: str | Path):
         self.cart = Cartridge.from_file(rom_path)
         self.mmu = MMU(self.cart)
+        self.timer = Timer(self.mmu)
+        self.mmu.timer = self.timer
         self.cpu = CPU(self.mmu)
         self.total_cycles = 0
 
     def steps(self) -> int:
         cycles = self.cpu.step()
+        self.timer.tick(cycles)
         self.total_cycles += cycles
         return cycles
 
