@@ -7,15 +7,15 @@ from pathlib import Path
 import pygame
 import pytest
 
-from src.gameboy.display import GRAY_PALETTE, framebuffer_surface
-from src.gameboy.gameboy import GameBoy
+from src.core.gameboy.display import GRAY_PALETTE, framebuffer_surface
+from src.core.gameboy.gameboy import GameBoy
+from tests.helpers import find_rom
 
 ROM_DIR = Path(__file__).parent / "roms" / "other"
 ACID_ROM = ROM_DIR / "dmg-acid2.gb"
 ACID_REF = ROM_DIR / "dmg-acid2-reference.png"
 ACID_ACTUAL = ROM_DIR / "dmg-acid2-actual.png"
-POKEMON_ROM = (Path(__file__).parent.parent / "src" / "rom" /
-               "Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb")
+POKEMON_ROM = find_rom("Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb")
 POKEMON_PNG = ROM_DIR / "pokemon-smoke-actual.png"
 
 
@@ -43,11 +43,13 @@ def test_dmg_acid2_pixel_perfect():
     assert bad == 0, f"{bad}/23040 mismatching pixels; see {ACID_ACTUAL} vs {ACID_REF}"
 
 
-@pytest.mark.slow
-def test_pokemon_smoke():
-    if not POKEMON_ROM.exists():
-        pytest.skip("commercial ROM not present")
-    gb = GameBoy(POKEMON_ROM)
+def test_pokemon_smoke(tmp_path):
+    if POKEMON_ROM is None:
+        pytest.skip("commercial ROM not present in rom/gb/ (Pokemon - Red Version)")
+    import shutil
+    rom = tmp_path / "pokemon.gb"          # private copy: the user's real .sav is
+    shutil.copyfile(POKEMON_ROM, rom)      # never read, deleted or overwritten
+    gb = GameBoy(rom)
     for _ in range(200_000):
         gb.steps()
     pygame.image.save(framebuffer_surface(gb.ppu.framebuffer, palette=GRAY_PALETTE),
@@ -78,14 +80,13 @@ def test_cgb_acid2_pixel_perfect():
     assert bad == 0, f"{bad} mismatching channel values; see {CGB_ACID_ACTUAL} vs {CGB_ACID_REF}"
 
 
-@pytest.mark.slow
 def test_cgb_game_smoke(tmp_path):
     import shutil
-    roms = sorted((Path(__file__).parent.parent / "src" / "rom").glob("*.gbc"))
-    if not roms:
-        pytest.skip("no .gbc ROM in src/rom/")
-    rom = tmp_path / roms[0].name               # private copy: never touch the real .sav
-    shutil.copy(roms[0], rom)
+    roms0 = find_rom("*.gbc")               # any CGB ROM (rom/gb_color/ or legacy src/rom/)
+    if roms0 is None:
+        pytest.skip("no .gbc ROM in rom/gb_color/ (e.g. Pokemon - Crystal Version)")
+    rom = tmp_path / roms0.name             # private copy: never touch the real .sav
+    shutil.copy(roms0, rom)
     gb = GameBoy(rom)
     assert gb.cgb
     for _ in range(300):

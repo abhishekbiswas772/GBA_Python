@@ -1,0 +1,404 @@
+"""In-game player: toolbar, game screen with overlays, session panel and status bar."""
+from __future__ import annotations
+
+import asyncio
+from typing import TYPE_CHECKING
+
+import flet as ft
+
+from src.bridge.adaptors import KeyboardAdaptor, normalize_key
+from src.ui import components as c
+from src.ui.data import library as lib
+from src.ui.data import samples
+from src.ui.emulator import frame as fr
+from src.ui.theme import SHADER_BY_KEY
+from src.ui.theme.tokens import OVERLAY_BG, OVERLAY_SUB, OVERLAY_TEXT, SCREEN_LABEL
+
+if TYPE_CHECKING:
+    from src.ui.app import App
+
+NATIVE = {"GB": (160, 144), "GBC": (160, 144), "GBA": (240, 160)}
+SLOT_KEYS = {1: "F1", 2: "F2", 3: "F3", 4: "—"}
+
+
+def norm_key(key: str) -> str:
+    """Key names as the settings screen stores them (same rules as the keyboard adaptor)."""
+    return normalize_key(key)
+
+
+def build(app: "App") -> ft.Control:
+    s = app.session
+    if s is None:                        # navigated here without a game
+        app.route = "library"
+        from src.ui.views.library import build as library
+        return library(app)
+    t, ui, wide, settings = app.t, app.ui, app.wide, app.settings
+    g = s.game
+
+    # ---------------------------------------------------------------- actions
+    def toggle_pause(e=None) -> None:
+        s.toggle_pause()
+        app.render()
+
+    def reset(e=None) -> None:
+        s.reset()
+        app.toast("Game reset")
+
+    def set_speed(v: str) -> None:
+        s.speed = int(v)
+        app.render()
+
+    def set_slot(n: int) -> None:
+        s.slot = n
+        app.render()
+
+    def screenshot(e=None) -> None:
+        path = s.screenshot()
+        if path is None:
+            app.toast("Nothing to capture yet")
+            return
+        ui.toast = str(path)
+        app.render()
+
+        async def hide(p=str(path)):
+            await asyncio.sleep(5)
+            if ui.toast == p and app.route == "player":
+                ui.toast = None
+                app.render()
+        app.page.run_task(hide)
+
+    def toggle_fullscreen(e=None) -> None:
+        if app.is_mobile or app.is_web or not app.page.window:
+            app.toast("Fullscreen is controlled by your device here.")
+            return
+        app.page.window.full_screen = not app.page.window.full_screen
+        app.page.update()
+
+    def open_moment(e=None) -> None:
+        ui.moments_sel = ui.toast
+        ui.toast = None
+        app.go("moments")
+
+    # ---------------------------------------------------------------- keyboard
+    keys = getattr(s, "keys", None)              # one adaptor per session: re-renders keep held keys
+    if keys is None:
+        keys = s.keys = KeyboardAdaptor(s.input, settings.keyboard)
+    else:
+        keys.set_mapping(settings.keyboard)
+    key_to_hot = {norm_key(v): k for k, v in settings.hotkeys.items() if v}
+    hot_actions = {
+        "pause": toggle_pause, "screenshot": screenshot, "fullscreen": toggle_fullscreen,
+        "rewind": lambda: app.not_ready("Rewind"),
+        "quick_save": lambda: app.not_ready("Save states"),
+        "quick_load": lambda: app.not_ready("Save states"),
+        "next_slot": lambda: set_slot(s.slot % 4 + 1),
+        "prev_slot": lambda: set_slot((s.slot - 2) % 4 + 1),
+    }
+
+    def on_key_down(e) -> None:
+        k = norm_key(e.key)
+        if keys.key_down(e.key):
+            return
+        act = key_to_hot.get(k)
+        if act == "fast_forward":
+            s.fast_forward = True
+        elif act in hot_actions:
+            hot_actions[act]()
+
+    def on_key_up(e) -> None:
+        k = norm_key(e.key)
+        if keys.key_up(e.key):
+            return
+        if key_to_hot.get(k) == "fast_forward":
+            s.fast_forward = False
+
+    # ---------------------------------------------------------------- header
+    def tool(icon_name, label, handler):
+        return c.icon_button(icon_name, handler, t, label, size=18)
+
+    rec_color = t.rec
+    toolbar = ft.Container(ft.Row([
+        tool(ft.Icons.PLAY_ARROW if s.paused else ft.Icons.PAUSE, "Resume" if s.paused else "Pause", toggle_pause),
+        tool(ft.Icons.FAST_REWIND, f"Rewind (hold {settings.hotkeys['rewind']})", lambda e: app.not_ready("Rewind")),
+        tool(ft.Icons.FAST_FORWARD, f"Fast forward (hold {settings.hotkeys['fast_forward']})",
+             lambda e: set_speed("1" if s.speed > 1 else "2")),
+        tool(ft.Icons.RESTART_ALT, "Reset", reset),
+        c.divider_v(t),
+        tool(ft.Icons.PHOTO_CAMERA_OUTLINED, f"Screenshot ({settings.hotkeys['screenshot']})", screenshot),
+        c.button([c.dot(rec_color, 10), c.text("Record", size=13, weight=600, kind="mono", color=t.text)],
+                 lambda e: app.not_ready("Video recording"), t, variant="ghost", height=40, h_pad=12, radius=8),
+        c.button([c.icon(ft.Icons.HISTORY, t.text, 16), c.text("Clip last 30s", size=13, weight=600, color=t.text),
+                  c.mono("F9", t, size=11)],
+                 lambda e: app.not_ready("Clips"), t, variant="ghost", height=40, h_pad=12, radius=8),
+        c.divider_v(t),
+        tool(ft.Icons.FULLSCREEN, f"Fullscreen ({settings.hotkeys['fullscreen']})", toggle_fullscreen),
+    ], spacing=2, tight=True, wrap=not wide), padding=4, bgcolor=t.bg, border=c.border(t.line), border_radius=10)
+
+    title = ft.Row([c.text(g.title, size=16, weight=600, kind="display", color=t.text, no_wrap=True),
+                    c.system_badge(g.system, t)], spacing=10, tight=True)
+    header = ft.Container(
+        c.bar(ft.Row([c.back_link(t, lambda e: app.go("library")), title], spacing=14),
+              [toolbar] if wide else [ft.Row([toolbar], scroll=ft.ScrollMode.AUTO)], wide=wide, spacing=14),
+        padding=c.pad(20 if wide else 12, 12), bgcolor=t.panel,
+        border=ft.Border.only(bottom=ft.BorderSide(1, t.line)),
+    )
+
+    # ---------------------------------------------------------------- screen
+    nw, nh = NATIVE[g.system]
+    side_w = 320
+    if wide:
+        avail_w = app.width - side_w - 64
+        avail_h = app.height - 64 - 41 - 64
+    else:
+        avail_w = app.width - 24
+        avail_h = app.height * (0.42 if app.touch_controls else 0.6)
+    scale = c.fit_scale(min(avail_w, 960), avail_h, nw, nh, settings.integer_scale)
+    sw, sh = nw * scale, nh * scale
+
+    layers: list[ft.Control] = [ft.Container(s.image, bgcolor=t.screen, left=0, top=0, right=0, bottom=0)]
+    overlay = fr.shader_overlay(settings.shader, nw, nh) if g.playable else None
+    if overlay:
+        layers.append(ft.Image(src=overlay, fit=ft.BoxFit.FILL, left=0, top=0, right=0, bottom=0,
+                               filter_quality=ft.FilterQuality.MEDIUM))
+    if s.error or not g.playable:
+        layers.append(ft.Container(
+            ft.Column([
+                c.mono("Game output", size=13, color=SCREEN_LABEL),
+                c.mono(f"{nw}×{nh} · {SHADER_BY_KEY[settings.shader].name}", size=11, color=SCREEN_LABEL),
+                ft.Container(height=8),
+                c.text(s.error or "", size=14, color=OVERLAY_TEXT, align=ft.TextAlign.CENTER),
+            ], spacing=6, horizontal_alignment=ft.CrossAxisAlignment.CENTER, tight=True),
+            left=0, top=0, right=0, bottom=0, alignment=ft.Alignment.CENTER, padding=24,
+        ))
+    if ui.toast:
+        toast = ft.Container(
+            ft.Row([
+                ft.Column([c.text("Moment saved", size=13, weight=600, color=OVERLAY_TEXT),
+                           c.text(f"Screenshot · {g.title}", size=12, color=OVERLAY_SUB)], spacing=2, tight=True),
+                c.button(c.text("Open", size=13, color=OVERLAY_TEXT), open_moment, t, height=36, h_pad=14,
+                         radius=8, side=c.alpha("#FFFFFF", 0.2)),
+                c.button(c.text("Share", size=13, weight=600, color="#0F1115"), open_moment, t, height=36,
+                         h_pad=14, radius=8, bg=OVERLAY_TEXT, variant="ghost"),
+            ], spacing=14, tight=True),
+            padding=ft.Padding.only(left=16, right=10, top=10, bottom=10),
+            bgcolor=c.alpha(OVERLAY_BG, 0.92), border=c.border(c.alpha("#FFFFFF", 0.12)), border_radius=12,
+        )
+        layers.append(ft.Container(ft.Row([toast], alignment=ft.MainAxisAlignment.CENTER),
+                                   bottom=20, left=0, right=0))
+    if s.paused and not s.error:
+        layers.append(ft.Container(
+            ft.Column([
+                c.heading("Paused", t, 32, color=OVERLAY_TEXT),
+                ft.Row([
+                    c.button(c.text("Resume", weight=600, color="#0F1115"), toggle_pause, t, variant="ghost",
+                             bg=OVERLAY_TEXT, h_pad=20),
+                    c.button(c.text("Screen & theme", color=OVERLAY_TEXT), lambda e: _leave(app, "appearance"), t,
+                             side=c.alpha("#FFFFFF", 0.25), h_pad=20),
+                    c.button(c.text("Controls", color=OVERLAY_TEXT), lambda e: _leave(app, "settings"), t,
+                             side=c.alpha("#FFFFFF", 0.25), h_pad=20),
+                ], spacing=10, wrap=True, alignment=ft.MainAxisAlignment.CENTER),
+            ], spacing=16, horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER),
+            left=0, top=0, right=0, bottom=0, bgcolor=c.alpha("#0B0D10", 0.74), border_radius=6,
+        ))
+    screen = ft.Container(
+        ft.Stack(layers, width=sw, height=sh), width=sw, height=sh, border_radius=6,
+        clip_behavior=ft.ClipBehavior.HARD_EDGE, bgcolor=t.screen,
+        shadow=[ft.BoxShadow(spread_radius=1, color=t.line),
+                ft.BoxShadow(blur_radius=60, offset=ft.Offset(0, 24), color=c.alpha("#000000", 0.45))],
+    )
+    stage_items: list[ft.Control] = [screen]
+    if app.touch_controls and g.playable:
+        stage_items.append(_touch_pad(app))
+    stage = ft.Container(
+        ft.Column(stage_items, spacing=20, horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                  alignment=ft.MainAxisAlignment.CENTER, tight=not wide),
+        alignment=ft.Alignment.CENTER, padding=32 if wide else 12, expand=wide,
+    )
+
+    # ---------------------------------------------------------------- side panel
+    tabs = c.segmented([("saves", "Saves"), ("cheats", "Cheats"), ("link", "Link")], ui.player_tab,
+                       lambda v: (setattr(ui, "player_tab", v), app.render()), t, equal=True)
+    panel: list[ft.Control] = [tabs]
+    if ui.player_tab == "saves":
+        panel.append(_saves(app, set_slot, set_speed))
+    elif ui.player_tab == "cheats":
+        panel.append(_cheats(app))
+    else:
+        panel.append(_link(app))
+
+    def on_volume(e) -> None:
+        settings.volume = int(e.control.value)
+        s.apply_volume()
+
+    def on_replay(v: bool) -> None:
+        settings.replay_buffer = v
+        settings.save()
+        app.render()
+
+    panel.append(ft.Container(ft.Column([
+        c.setting_row("Volume", ft.Slider(value=settings.volume, min=0, max=100, width=150, active_color=t.accent,
+                                          inactive_color=t.line2, thumb_color=t.accent, on_change=on_volume,
+                                          on_change_end=lambda e: settings.save()), t),
+        c.setting_row("Replay buffer (last 60 s)", c.checkbox(settings.replay_buffer, on_replay, t,
+                                                              "Replay buffer"), t),
+    ], spacing=12), padding=ft.Padding.only(top=16), border=ft.Border.only(top=ft.BorderSide(1, t.line)),
+        margin=ft.Margin.only(top=0)))
+    panel.insert(-1, c.spacer())
+    side = c.side_panel(t, panel, width=side_w, wide=wide, padding=20, spacing=22, fits=app.height >= 860)
+
+    # ---------------------------------------------------------------- footer
+    status_dot = c.dot("#F2A65A" if s.paused else t.gb)
+    status_text = c.mono("Paused" if s.paused else "Running", t)
+    fps_text = c.mono(f"{s.fps:.2f} FPS", t)
+
+    def on_status() -> None:
+        if s.error and not s.paused:
+            return
+        fps_text.value = f"{s.fps:.2f} FPS"
+        try:
+            fps_text.update()
+        except Exception:
+            pass
+        if s.error:
+            app.render()
+    s.on_status = on_status
+
+    footer_items = [
+        ft.Row([status_dot, status_text], spacing=8, tight=True), fps_text,
+        c.mono(f"{s.speed * 100}% speed", t), c.mono(f"Slot {s.slot}", t),
+    ]
+    if settings.replay_buffer:
+        footer_items.append(c.mono("Replay buffer 60 s", t))
+    footer_items.append(c.mono("Link: 1 player", t))
+    footer = ft.Container(
+        ft.Row([ft.Row(footer_items, spacing=22, wrap=True, run_spacing=4, expand=True),
+                c.mono(f"{g.filename} · {lib.human_size(g.size)}", t)], spacing=22),
+        padding=c.pad(20, 10), bgcolor=t.panel, border=ft.Border.only(top=ft.BorderSide(1, t.line)),
+    )
+
+    body = c.split(stage, side, wide=wide)
+    root = ft.Column([header, ft.Container(body, expand=True), footer], spacing=0, expand=True)
+    return ft.KeyboardListener(ft.Container(root, bgcolor=t.bg, expand=True), autofocus=True,
+                               on_key_down=on_key_down, on_key_up=on_key_up)
+
+
+def _leave(app: "App", route: str) -> None:
+    """Pause-menu shortcut to another screen. Leaving the player saves battery RAM
+    and ends the session (the core has no save states to resume from)."""
+    app.go(route)
+
+
+# -------------------------------------------------------------------- panel tabs
+def _saves(app: "App", set_slot, set_speed) -> ft.Control:
+    t, s = app.t, app.session
+    rows: list[ft.Control] = [ft.Row([c.heading("Save states", t, 15), ft.Container(expand=True),
+                                      c.text("Not in core yet", size=12, color=t.muted)])]
+    for n in range(1, 5):
+        on = s.slot == n
+        rows.append(c.button(ft.Row([
+            ft.Container(width=72, height=48, bgcolor=t.screen, border_radius=4),
+            ft.Column([c.text(f"Slot {n}", size=13, weight=600, color=t.text),
+                       c.text("Empty", size=12, color=t.muted)], spacing=3, tight=True, expand=True),
+            c.mono(SLOT_KEYS[n], t, size=11),
+        ], spacing=12), (lambda e, k=n: set_slot(k)), t, variant="ghost", height=64, h_pad=8,
+            bg=t.soft if on else t.card, side=t.accent if on else t.line, align=ft.Alignment.CENTER_LEFT))
+    rows.append(ft.Container(c.heading("Speed", t, 15), margin=ft.Margin.only(top=12)))
+    rows.append(c.segmented([(str(v), f"{v}×") for v in (1, 2, 4, 8)], str(s.speed), set_speed, t,
+                            mono_font=True, equal=True))
+    return ft.Column(rows, spacing=10)
+
+
+def _cheats(app: "App") -> ft.Control:
+    t, ui = app.t, app.ui
+
+    def toggle(cid: str, v: bool) -> None:
+        ui.cheats[cid] = v
+        app.render()
+
+    rows: list[ft.Control] = [
+        ft.Row([c.heading("Cheats", t, 15), ft.Container(expand=True),
+                c.button(c.text("+ Add code", size=13, color=t.accent), lambda e: app.not_ready("Cheats"), t,
+                         variant="ghost", height=32, h_pad=6)]),
+        c.text("GameShark, Action Replay and Code Breaker codes. Achievements pause while cheats are on. "
+               "Preview: codes are not applied by the core yet.", size=12, color=t.muted),
+    ]
+    for ch in samples.CHEATS:
+        rows.append(ft.Container(ft.Row([
+            ft.Column([c.text(ch["name"], size=13, weight=600, color=t.text),
+                       c.mono(ch["code"], t, size=11)], spacing=3, tight=True, expand=True),
+            c.checkbox(ui.cheats.get(ch["id"], False), lambda v, k=ch["id"]: toggle(k, v), t, ch["name"]),
+        ], spacing=12), padding=c.pad(12, 10), border_radius=10, bgcolor=t.card, border=c.border(t.line)))
+    return ft.Column(rows, spacing=10)
+
+
+def _link(app: "App") -> ft.Control:
+    t = app.t
+    return ft.Column([
+        c.heading("Link cable · online", t, 15),
+        c.text("Trade, battle or race with a friend as if you were linked by cable. Preview: link play "
+               "isn't in the core yet.", size=12, color=t.muted),
+        c.card(ft.Column([
+            c.text("Room code", size=12, color=t.muted),
+            c.mono(samples.ROOM_CODE, size=22, weight=500, color=t.text, spacing=2.6),
+            ft.Container(height=6),
+            c.button("Copy invite link", lambda e: app.not_ready("Link play"), t, variant="primary", height=40,
+                     radius=8, expand=True),
+        ], spacing=6, horizontal_alignment=ft.CrossAxisAlignment.STRETCH), t, padding=14, radius=12),
+        c.card(ft.Row([
+            ft.Container(c.text("P2", size=12, weight=600, color=t.text), width=32, height=32, border_radius=16,
+                         bgcolor=t.card2, alignment=ft.Alignment.CENTER),
+            ft.Column([c.text(samples.FRIEND, size=13, weight=600, color=t.text),
+                       c.text("Connected · 38 ms", size=12, color=t.muted)], spacing=2, tight=True, expand=True),
+            c.dot(t.gb),
+        ], spacing=10), t, padding=c.pad(12, 10), radius=10),
+        c.button(c.text("Open link play & achievements", size=13, color=t.accent),
+                 lambda e: app.go("together"), t, variant="ghost", height=32, h_pad=0,
+                 align=ft.Alignment.CENTER_LEFT),
+    ], spacing=12)
+
+
+# -------------------------------------------------------------------- touch controls
+def _touch_pad(app: "App") -> ft.Control:
+    t, s = app.t, app.session
+
+    def hold(content: ft.Control, button: str) -> ft.GestureDetector:
+        def down(e):
+            s.press(button, "touch")
+
+        def up(e):
+            s.release(button, "touch")
+        return ft.GestureDetector(content, on_tap_down=down, on_tap_up=up, on_tap_cancel=up,
+                                  on_long_press_end=up, on_pan_end=up, on_pan_cancel=up)
+
+    def key(label: str, button: str, size: float = 52, round_: bool = False, fill: str | None = None) -> ft.Control:
+        box = ft.Container(
+            c.text(label, size=14 if len(label) == 1 else 11, weight=600,
+                   color=t.on if fill == t.accent else t.text),
+            width=size, height=size if not label.isalpha() or len(label) == 1 else 30,
+            border_radius=size / 2 if round_ else 10, bgcolor=fill or t.card2,
+            alignment=ft.Alignment.CENTER,
+        )
+        return hold(box, button)
+
+    blank = ft.Container(width=52, height=52)
+    dpad = ft.Column([
+        ft.Row([blank, key("▲", "Up"), blank], spacing=0, tight=True),
+        ft.Row([key("◀", "Left"), ft.Container(width=52, height=52, bgcolor=t.card2), key("▶", "Right")],
+               spacing=0, tight=True),
+        ft.Row([blank, key("▼", "Down"), blank], spacing=0, tight=True),
+    ], spacing=0, tight=True)
+    ab = ft.Row([
+        ft.Container(key("B", "B", 60, True, t.accent), margin=ft.Margin.only(top=36)),
+        key("A", "A", 60, True, t.accent),
+    ], spacing=14, tight=True, vertical_alignment=ft.CrossAxisAlignment.START)
+    start_select = ft.Row([key("SELECT", "Select", 72), key("START", "Start", 72)], spacing=12, tight=True)
+    rows = []
+    if s.game.system == "GBA":                 # shoulder buttons only exist on GBA
+        rows.append(ft.Row([key("L", "L", 60, True), key("R", "R", 60, True)],
+                           alignment=ft.MainAxisAlignment.SPACE_BETWEEN, spacing=0, tight=True))
+    rows += [
+        ft.Row([dpad, ab], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+               vertical_alignment=ft.CrossAxisAlignment.CENTER),
+        ft.Row([start_select], alignment=ft.MainAxisAlignment.CENTER),
+    ]
+    return ft.Container(ft.Column(rows, spacing=16), width=min(app.width - 24, 520), padding=c.pad(8, 0))

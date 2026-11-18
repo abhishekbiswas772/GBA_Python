@@ -10,17 +10,16 @@ from pathlib import Path
 
 import pytest
 
-from src.gameboy.gameboy import GameBoy
+from src.core.gameboy.gameboy import GameBoy
+from tests.helpers import find_rom
 
-POKEMON_ROM = (Path(__file__).parent.parent / "src" / "rom" /
-               "Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb")
+POKEMON_ROM = find_rom("Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb")
 POKEMON_WAV = Path(__file__).parent / "roms" / "other" / "pokemon-audio-actual.wav"
 
 
-@pytest.mark.slow
 def test_pokemon_red_title_audio(tmp_path):
-    if not POKEMON_ROM.exists():
-        pytest.skip("commercial ROM not present")
+    if POKEMON_ROM is None:
+        pytest.skip("commercial ROM not present in rom/gb/ (Pokemon - Red Version)")
     rom = tmp_path / "pokemon.gb"             # private copy: never touch the real .sav
     shutil.copyfile(POKEMON_ROM, rom)
     gb = GameBoy(rom)

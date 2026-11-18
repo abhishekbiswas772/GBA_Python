@@ -1,23 +1,23 @@
 [project]
-name = "gameboy"
+name = "gba-python"
 version = "0.1.0"
-description = "Add your description here"
+description = "Game Boy, Game Boy Color and Game Boy Advance emulator in pure Python, with a Flet desktop app"
 readme = "README.md"
 authors = [
-    { name = "Abhishek Biswas", email = "cubastion.choudhary@daimlertruck.com" }
+    { name = "Abhishek Biswas", email = "abhishekbiswas772@gmail.com" }
 ]
 requires-python = ">=3.13"
 dependencies = [
     "pygame>=2.6.1",
+    "flet[all]",
 ]
 
-[project.scripts]
-gameboy = "gameboy:main"
+[dependency-groups]
+dev = ["pytest"]
 
-[build-system]
-requires = ["uv_build>=0.13.5,<0.14.0"]
-build-backend = "uv_build"
+[tool.uv]
+package = false          # an application: run with `python main.py`, nothing to build
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-markers = ["slow: Blargg ROM integration tests, run with --slow"]
+markers = ["slow: ROM integration tests (Blargg, acid2, commercial ROMs), run with --slow"]

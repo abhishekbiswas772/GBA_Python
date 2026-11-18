@@ -4,9 +4,9 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 import pygame
 
-from src.gameboy.display import KEYMAP, joypad_key_handler
-from src.gameboy.gameboy import GameBoy
-from src.gameboy.joypad import DOWN, RIGHT, START, A
+from src.core.gameboy.display import KEYMAP, joypad_key_handler
+from src.core.gameboy.gameboy import GameBoy
+from src.core.gameboy.joypad import DOWN, RIGHT, START, A
 from tests.helpers import build, make_rom
 
 

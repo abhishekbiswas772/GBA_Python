@@ -167,8 +167,8 @@ def test_timer_overflow_triggers_dispatch():
 
 
 def test_io_read_masks():
-    from src.gameboy.cartridge import Cartridge
-    from src.gameboy.mmu import MMU
+    from src.core.gameboy.cartridge import Cartridge
+    from src.core.gameboy.mmu import MMU
     from tests.helpers import blank_rom
     mmu = MMU(Cartridge(bytes(blank_rom())))
     mmu.write(0xFF0F, 0x00)
@@ -181,8 +181,8 @@ def test_io_read_masks():
 
 
 def test_serial_transfer_completes_without_partner():
-    from src.gameboy.cartridge import Cartridge
-    from src.gameboy.mmu import MMU
+    from src.core.gameboy.cartridge import Cartridge
+    from src.core.gameboy.mmu import MMU
     from tests.helpers import blank_rom
     mmu = MMU(Cartridge(bytes(blank_rom())))
     mmu.write(0xFF01, ord("A"))
@@ -194,7 +194,7 @@ def test_serial_transfer_completes_without_partner():
 
 
 def test_debugger_steps_and_breaks():
-    from src.gameboy.debugger import Debugger
+    from src.core.gameboy.debugger import Debugger
 
     class _GB:                           # minimal GameBoy facade
         def __init__(self):

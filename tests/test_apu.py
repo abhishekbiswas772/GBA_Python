@@ -3,9 +3,9 @@ import os
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 
-from src.gameboy.apu import APU, CYCLES_PER_SECOND, FS_PERIOD, NoiseChannel, PulseChannel
-from src.gameboy.cartridge import Cartridge
-from src.gameboy.mmu import MMU
+from src.core.gameboy.apu import APU, CYCLES_PER_SECOND, FS_PERIOD, NoiseChannel, PulseChannel
+from src.core.gameboy.cartridge import Cartridge
+from src.core.gameboy.mmu import MMU
 from tests.helpers import blank_rom
 
 
@@ -614,7 +614,7 @@ def test_sample_rate_and_format():
 # --- GameBoy integration ----------------------------------------------------
 
 def test_gameboy_ticks_apu(tmp_path):
-    from src.gameboy.gameboy import GameBoy
+    from src.core.gameboy.gameboy import GameBoy
     rom = tmp_path / "blank.gb"
     rom.write_bytes(bytes(blank_rom()))
     gb = GameBoy(rom)

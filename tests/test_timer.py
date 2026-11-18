@@ -1,8 +1,8 @@
 import pytest
 
-from src.gameboy.cartridge import Cartridge
-from src.gameboy.mmu import MMU
-from src.gameboy.timer import Timer
+from src.core.gameboy.cartridge import Cartridge
+from src.core.gameboy.mmu import MMU
+from src.core.gameboy.timer import Timer
 from tests.helpers import blank_rom, build, make_rom
 
 

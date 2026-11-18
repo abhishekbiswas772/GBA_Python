@@ -1,10 +1,10 @@
 """Game Boy Color: mode select, VRAM/WRAM banks, KEY1 double speed, HDMA, palettes, rendering."""
-from src.gameboy.cartridge import Cartridge
-from src.gameboy.cpu import CPU
-from src.gameboy.gameboy import GameBoy
-from src.gameboy.mmu import MMU
-from src.gameboy.ppu import PPU
-from src.gameboy.timer import Timer
+from src.core.gameboy.cartridge import Cartridge
+from src.core.gameboy.cpu import CPU
+from src.core.gameboy.gameboy import GameBoy
+from src.core.gameboy.mmu import MMU
+from src.core.gameboy.ppu import PPU
+from src.core.gameboy.timer import Timer
 from tests.helpers import make_rom
 
 

@@ -10,9 +10,10 @@ from pathlib import Path
 import pygame
 import pytest
 
-from src.gameboy.cartridge import Cartridge, MBC1, MBC2, MBC3, MBC5
-from src.gameboy.display import GRAY_PALETTE, framebuffer_surface
-from src.gameboy.gameboy import GameBoy
+from src.core.gameboy.cartridge import Cartridge, MBC1, MBC2, MBC3, MBC5
+from src.core.gameboy.display import GRAY_PALETTE, framebuffer_surface
+from src.core.gameboy.gameboy import GameBoy
+from tests.helpers import find_rom
 
 ROM_SIZE_CODE = {2: 0, 4: 1, 8: 2, 16: 3, 32: 4, 64: 5, 128: 6, 256: 7, 512: 8}
 RAM_SIZE_CODE = {0: 0, 8: 2, 32: 3, 128: 4, 64: 5}
@@ -247,15 +248,13 @@ def test_mbc3_no_rtc_pokemon_path():
 
 # --- Pokemon Red (MBC3 + battery): boot to title, SRAM save persistence -----
 
-POKEMON_ROM = (Path(__file__).parent.parent / "src" / "rom" /
-               "Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb")
+POKEMON_ROM = find_rom("Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb")
 POKEMON_PNG = Path(__file__).parent / "roms" / "other" / "pokemon-title-actual.png"
 
 
-@pytest.mark.slow
 def test_pokemon_red_title_and_battery_save(tmp_path):
-    if not POKEMON_ROM.exists():
-        pytest.skip("commercial ROM not present")
+    if POKEMON_ROM is None:
+        pytest.skip("commercial ROM not present in rom/gb/ (Pokemon - Red Version)")
     rom = tmp_path / "pokemon.gb"          # private copy: the user's real .sav is
     shutil.copyfile(POKEMON_ROM, rom)      # never read, deleted or overwritten
     sav = rom.with_suffix(".sav")

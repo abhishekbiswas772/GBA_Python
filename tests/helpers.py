@@ -4,6 +4,31 @@ from pathlib import Path
 REAL_HARDWARE_HZ = 4194304
 CYCLE_BUDGET = 100_000_000
 
+# Commercial ROM folders, in lookup order. "src/rom" is the legacy layout.
+_ROM_SEARCH_DIRS = ("rom", "rom/gb", "rom/gb_color", "rom/gba", "src/rom")
+
+
+def find_rom(name: str) -> Path | None:
+    """Resolve a ROM by filename (or glob pattern) across the repo's ROM folders.
+
+    Searches rom/, rom/gb/, rom/gb_color/, rom/gba/ (current layout) and the
+    legacy src/rom/ (old layout). Returns the first match (glob matches in
+    sorted order per folder) or None when nothing is found, so callers can
+    pytest.skip() when a commercial ROM is absent. Read-only: callers must
+    never write to or delete the returned ROM or its .sav.
+    """
+    root = Path(__file__).resolve().parent.parent
+    is_pattern = any(ch in name for ch in "*?[")
+    for sub in _ROM_SEARCH_DIRS:
+        folder = root / sub
+        if is_pattern:
+            found = sorted(folder.glob(name))
+            if found:
+                return found[0]
+        elif (folder / name).is_file():
+            return folder / name
+    return None
+
 
 def blank_rom() -> bytearray:
     rom = bytearray(0x8000)
@@ -21,11 +46,11 @@ def make_rom(program: bytes = b"", org: int = 0x150,
 
 
 def build(rom: bytes):
-    from src.gameboy.cartridge import Cartridge
-    from src.gameboy.cpu import CPU
-    from src.gameboy.joypad import Joypad
-    from src.gameboy.mmu import MMU
-    from src.gameboy.timer import Timer
+    from src.core.gameboy.cartridge import Cartridge
+    from src.core.gameboy.cpu import CPU
+    from src.core.gameboy.joypad import Joypad
+    from src.core.gameboy.mmu import MMU
+    from src.core.gameboy.timer import Timer
     mmu = MMU(Cartridge(rom))
     timer = Timer(mmu)
     mmu.timer = timer
@@ -36,10 +61,10 @@ def build(rom: bytes):
 
 
 def build_ppu():
-    from src.gameboy.cartridge import Cartridge
-    from src.gameboy.mmu import MMU
-    from src.gameboy.ppu import PPU
-    from src.gameboy.timer import Timer
+    from src.core.gameboy.cartridge import Cartridge
+    from src.core.gameboy.mmu import MMU
+    from src.core.gameboy.ppu import PPU
+    from src.core.gameboy.timer import Timer
     mmu = MMU(Cartridge(make_rom()))
     timer = Timer(mmu)
     mmu.timer = timer
@@ -54,7 +79,7 @@ def run_serial(rom_path: str | Path, budget: int = CYCLE_BUDGET, cgb: bool | Non
     cgb=False forces DMG mode (the Blargg ROMs are CGB-flagged), True forces CGB.
     Returns (text, cycles, wall_seconds, done).
     """
-    from src.gameboy.gameboy import GameBoy
+    from src.core.gameboy.gameboy import GameBoy
     gb = GameBoy(rom_path, cgb=cgb)
     t0 = time.perf_counter()
     steps = gb.steps

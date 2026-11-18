@@ -25,3 +25,4 @@ tests/roms/other/window-screenshot.png
 .pytest_cache/
 prof
 *.prof
+rom/
