@@ -35,6 +35,9 @@ def _walk(node, seen):
         return
     if isinstance(node, ft.BaseControl):
         validate(node)
+    if isinstance(node, ft.GestureDetector):          # checked by the Flutter client, not validate()
+        assert any(getattr(node, f.name) for f in dataclasses.fields(node) if f.name.startswith("on_")), \
+            "GestureDetector should have at least one event handler"
     for f in dataclasses.fields(node):
         if f.name.startswith("_") or f.name in ("parent", "page"):
             continue

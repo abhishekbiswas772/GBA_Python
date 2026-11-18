@@ -31,8 +31,14 @@ def unfocusable():
 
 
 def tap(content: ft.Control, on_click: Handler, *, tooltip: str | None = None, expand=None,
-        col=None) -> ft.GestureDetector:
-    """A clickable area that never takes keyboard focus."""
+        col=None) -> ft.Control:
+    """A clickable area that never takes keyboard focus.
+
+    Without a handler (a disabled button) it's a plain Container: the Flutter
+    client rejects a GestureDetector that has no event handler at all."""
+    if on_click is None:
+        return ft.Container(content=content, tooltip=tooltip, expand=expand,
+                            col=col if col is not None else 12)
     return ft.GestureDetector(
         content=content, on_tap=on_click,
         mouse_cursor=ft.MouseCursor.CLICK if on_click else None,
