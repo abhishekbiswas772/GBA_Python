@@ -53,6 +53,7 @@ def _page():
         dark_theme=None, theme_mode=None, fonts=None, title="", padding=0, spacing=0,
         overlay=[], services=[], on_resize=None, on_platform_brightness_change=None,
         on_keyboard_event=None, on_close=None, platform_brightness=None,
+        dialogs=[], show_dialog=None, pop_dialog=None,
     )
 
 
@@ -95,3 +96,69 @@ def test_player_validates(app, system, monkeypatch):
         _walk(VIEWS["player"](app), set())
     finally:
         app.session = None
+
+
+def test_player_with_states_and_recording_validates(app, tmp_path, monkeypatch):
+    """Saves panel with a filled slot + resume point, recording in progress, and a GIF
+    in Moments: all must pass Flet's validation."""
+    from src.bridge import load
+    from src.core.adaptors import saves
+    from src.ui.data.moments import new_path
+    from src.ui.emulator import frame as fr
+    from src.ui.emulator import session as sess
+    from src.ui.views import VIEWS
+    game = next((g for g in app.games if g.system == "NES"), None)
+    if game is None:
+        pytest.skip("no NES test ROM")
+    saves.set_save_dir(tmp_path / "saves")
+    m = load(game.path)
+    png = fr.encode_png(m.frame_rgb(), m.width, m.height)
+    monkeypatch.setattr(sess.EmulatorSession, "start", lambda self: None)
+    s = sess.EmulatorSession(app.page, game, app.settings)
+    for slot in (0, 1):
+        s.slots.save(m, slot, thumbnail=png)
+    s.runner.machine = m                       # as if the worker had loaded it
+    s.runner.recorder.start(0)
+    app.session, app.route = s, "player"
+    try:
+        _walk(VIEWS["player"](app), set())
+    finally:
+        app.session = None
+    rec = s.runner.recorder
+    rec.feed(m.frame_rgb(), m.width, m.height, 2)
+    done = []
+    rec.stop(new_path(game.title, "NES", ".gif"), on_done=lambda p, e: done.append(e))
+    import time
+    t0 = time.time()
+    while not done and time.time() - t0 < 20:
+        time.sleep(0.05)
+    assert done == [None]
+    app.route = "moments"
+    _walk(VIEWS["moments"](app), set())
+
+
+def test_leaving_a_game_pauses_and_asks_to_save(app, monkeypatch):
+    from src.bridge import load
+    from src.ui.emulator import session as sess
+    game = next((g for g in app.games if g.system == "NES"), None)
+    if game is None:
+        pytest.skip("no NES test ROM")
+    page = app.page
+    page.show_dialog = page.dialogs.append
+    page.pop_dialog = lambda: page.dialogs.pop() if page.dialogs else None
+    monkeypatch.setattr(sess.EmulatorSession, "start", lambda self: None)
+    s = sess.EmulatorSession(page, game, app.settings)
+    s.runner.machine = load(game.path)
+    app.session, app.route = s, "player"
+    app.go("library")
+    assert app.route == "player" and app.session is s          # not left yet
+    assert s.paused                                           # game paused behind the dialog
+    (dialog,) = page.dialogs
+    _walk(dialog, set())
+    labels = [a.content.value for a in dialog.actions]
+    assert labels == ["Cancel", "Leave without saving", "Save and leave"]
+    dialog.actions[0].on_click(None)                         # Cancel: back to the game, running
+    assert not page.dialogs and not s.paused and app.session is s
+    app.go("library")
+    page.dialogs[-1].actions[1].on_click(None)               # Leave without saving
+    assert app.route == "library" and app.session is None

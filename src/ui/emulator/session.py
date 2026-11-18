@@ -19,6 +19,7 @@ from pathlib import Path
 import flet as ft
 
 from src import bridge
+from src.bridge import savestate
 from src.bridge.adaptors import GamepadAdaptor, InputRouter
 from src.bridge.runner import EmulatorRunner, Stats
 from src.ui.data.library import Game
@@ -69,7 +70,11 @@ class EmulatorSession:
         self._t_start = time.time()
         web = page is not None and bool(getattr(page, "web", False))
         self.runner = EmulatorRunner(lambda: bridge.load(game.path), audio=not web,
-                                     palette=self._palette(), name=f"emu:{game.filename}")
+                                     palette=self._palette(), name=f"emu:{game.filename}",
+                                     replay=settings.replay_buffer)
+        # save-state slots live in the game's save folder: saves/<core>/<game>/states/
+        self.slots = savestate.SlotStore(game.path, game.system.lower())
+        self._slot_snaps: dict[int, tuple] = {}    # slot -> (in-memory snapshot, file mtime)
         self.input = InputRouter(_RunnerSink(self))     # keyboard + touch + gamepads
         self.gamepads = self._gamepads()
         self.apply_volume()
@@ -135,6 +140,8 @@ class EmulatorSession:
     def close(self) -> None:
         self._running = False
         self.input.release_all()
+        if self.recording:                     # closing mid-recording keeps what was recorded
+            self.stop_recording()
         self.runner.close()                    # worker saves battery RAM + closes audio
         m = self.machine
         if self._rgb and m:
@@ -252,6 +259,84 @@ class EmulatorSession:
                 self.on_status()
             except Exception:
                 pass
+
+    # ------------------------------------------------------------------ save states
+    def _thumbnail(self) -> bytes | None:
+        m = self.machine
+        if not self._rgb or not m:
+            return None
+        return fr.encode_png(self._rgb, m.width, m.height)
+
+    async def save_state(self, slot: int) -> dict:
+        """Save the current moment to `slot` (0 = the resume point). Runs on the emulator thread."""
+        thumb = self._thumbnail()
+        store, cache = self.slots, self._slot_snaps
+
+        def work(m):
+            snap = savestate.capture(m, level=1)
+            meta = store.save(m, slot, thumbnail=thumb)
+            cache[slot] = (snap, store.path(slot).stat().st_mtime)
+            return meta
+        return await asyncio.wrap_future(self.runner.submit(work))
+
+    async def load_state(self, slot: int) -> None:
+        """Load `slot`. A slot saved in this session is restored in place (instant)."""
+        store, cache = self.slots, self._slot_snaps
+
+        def work(m):
+            hit = cache.get(slot)
+            p = store.path(slot)
+            if hit is not None and p.is_file() and p.stat().st_mtime == hit[1]:
+                savestate.restore(m, hit[0])
+            else:
+                store.load(m, slot)
+        self.input.release_all()
+        await asyncio.wrap_future(self.runner.submit(work))
+        self._prev = None
+
+    def slot_info(self) -> list[dict]:
+        return self.slots.list()
+
+    # ------------------------------------------------------------------ rewind
+    def set_rewinding(self, on: bool) -> None:
+        if on:
+            self.input.release_all()
+        self.runner.set_rewinding(on)
+
+    @property
+    def rewinding(self) -> bool:
+        return self.runner.rewinding
+
+    @property
+    def rewind_seconds(self) -> float:
+        rw = self.runner.rewind
+        return rw.seconds if rw is not None else 0.0
+
+    # ------------------------------------------------------------------ recording
+    @property
+    def recording(self) -> bool:
+        return self.runner.recorder.recording
+
+    def _gif_opts(self) -> dict:
+        w, _ = self._native()
+        transform = fr.lcd_correct if (self.game.system == "GBC" and self.settings.lcd_colors) else None
+        return {"scale": 2 if w <= 160 else 1, "transform": transform}
+
+    def start_recording(self) -> None:
+        self.runner.recorder.start(self.runner.frames)
+
+    def stop_recording(self, on_done=None) -> bool:
+        """Stop and encode in the background; on_done(path | None, error)."""
+        path = new_path(self.game.title, self.game.system, ".gif")
+        return self.runner.recorder.stop(path, on_done=on_done, **self._gif_opts())
+
+    def clip(self, seconds: float = 30, on_done=None) -> bool:
+        """Save the last `seconds` of play as a GIF (background)."""
+        path = new_path(self.game.title, self.game.system, ".gif")
+        return self.runner.recorder.clip(path, seconds=seconds, on_done=on_done, **self._gif_opts())
+
+    def set_replay_buffer(self, on: bool) -> None:
+        self.runner.recorder.replay_on = bool(on)
 
     # ------------------------------------------------------------------ moments
     def screenshot(self) -> Path | None:

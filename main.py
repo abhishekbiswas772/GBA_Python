@@ -50,7 +50,7 @@ def ensure_save_dir() -> Path | None:
         from src.ui.data.settings import Settings
         return Settings.load().apply_save_dir()
     except ImportError:                       # UI package missing: plain ./saves
-        from src.core.saves import set_save_dir
+        from src.core.adaptors.saves import set_save_dir
         return set_save_dir(ROOT / "saves")
 
 

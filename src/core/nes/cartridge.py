@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from src.core.saves import sav_path_for
+from src.core.adaptors.saves import sav_path_for
 
 from src.core.nes.common import (
     MIRROR_FOUR, MIRROR_HORIZONTAL, MIRROR_SINGLE0, MIRROR_SINGLE1, MIRROR_VERTICAL,

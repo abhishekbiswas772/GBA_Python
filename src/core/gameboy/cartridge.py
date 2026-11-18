@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.core.saves import sav_path_for
+from src.core.adaptors.saves import sav_path_for
 from src.core.gameboy.common import (
     NINTENDO_LOGO, CARTRIDGE_TYPES, RAM_SIZES,
     BATTERY_TYPES, RTC_TYPES,
@@ -127,8 +127,9 @@ class Cartridge:
     """ROM-only cartridge (also ROM+RAM types 0x08/0x09). Base for the MBCs."""
     rtc = None
 
-    def __new__(cls, rom: bytes, path: Path | str | None = None):
-        if cls is Cartridge:           # factory dispatch on header 0x0147
+    def __new__(cls, rom: bytes | None = None, path: Path | str | None = None):
+        if cls is Cartridge and rom is not None:   # factory dispatch on header 0x0147
+            # (rom is None when pickle rebuilds a save state: the class is already exact)
             cls = _mapper_class(parse_header(rom))
         return super().__new__(cls)
 

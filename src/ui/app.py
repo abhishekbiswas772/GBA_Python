@@ -110,8 +110,13 @@ class App:
         return next((g for g in self.games if g.path == path), None)
 
     # ------------------------------------------------------------------ routing
-    def go(self, route: str) -> None:
+    def go(self, route: str, *, confirmed: bool = False) -> None:
         assert route in ROUTES, route
+        if (not confirmed and route != "player" and self.route == "player"
+                and self.session is not None and self.session.machine is not None
+                and not self.session.error):
+            self._confirm_leave(route)           # pause and offer to save first
+            return
         playing = self.session.game.system if self.session else None
         if route != "player":
             self.close_session()
@@ -127,7 +132,7 @@ class App:
         self.route = route
         self.render()
 
-    def play(self, game: lib.Game) -> None:
+    def play(self, game: lib.Game, load_slot: int | None = None) -> None:
         self.close_session()
         if self.previews is not None:
             self.previews.busy.set()                    # previews wait while you play
@@ -137,6 +142,19 @@ class App:
         self.route = "player"
         self.render()
         self.session.start()
+        if load_slot is not None:
+            s = self.session
+
+            async def load() -> None:
+                await asyncio.to_thread(s.runner.ready.wait, 30)
+                if self.session is not s or s.error:
+                    return
+                try:
+                    await s.load_state(load_slot)
+                    self.toast("Loaded the resume point" if load_slot == 0 else f"Loaded slot {load_slot}")
+                except Exception as err:
+                    self.toast(f"Couldn't load the save state: {err}")
+            self.page.run_task(load)
 
     def close_session(self) -> None:
         if self.session:
@@ -181,6 +199,60 @@ class App:
         if self.route == "library" and e.ctrl and e.key.upper() == "K":
             from src.ui.views.library import focus_search
             self.page.run_task(focus_search, self)
+
+    def _confirm_leave(self, route: str) -> None:
+        """Leaving a running game: pause it and ask whether to save a state first.
+        Without one, the exact moment is lost (in-game battery saves are always kept)."""
+        s = self.session
+        t = self.t
+        was_running = not s.paused
+        if was_running:
+            s.toggle_pause()
+
+        def close_dialog() -> None:
+            try:
+                self.page.pop_dialog()
+            except Exception:
+                pass
+
+        def stay(e=None) -> None:
+            close_dialog()
+            if was_running and self.session is s and s.paused:
+                s.toggle_pause()
+            self.render()
+
+        def leave(e=None) -> None:
+            close_dialog()
+            self.go(route, confirmed=True)
+
+        async def save_and_leave(e=None) -> None:
+            close_dialog()
+            try:
+                await s.save_state(0)
+            except Exception as err:
+                self.toast(f"Couldn't save: {err}")
+                self.render()
+                return
+            self.go(route, confirmed=True)
+            self.toast(f"Saved. Continue {s.game.title} from the library.")
+
+        btn = lambda label, fn, primary=False: ft.TextButton(  # noqa: E731
+            content=ft.Text(label, weight=ft.FontWeight.W_600 if primary else None,
+                            color=t.on if primary else t.text, font_family=family()),
+            on_click=fn, style=ft.ButtonStyle(bgcolor=t.accent if primary else None,
+                                              padding=ft.Padding.symmetric(horizontal=16, vertical=10),
+                                              shape=ft.RoundedRectangleBorder(radius=8)))
+        self.page.show_dialog(ft.AlertDialog(
+            modal=True, bgcolor=t.card,
+            title=ft.Text("Save before you leave?", color=t.text, font_family=family()),
+            content=ft.Text(f"The game is paused. Save a state to pick {s.game.title} up exactly "
+                            "where you are; otherwise this moment is lost. Progress the game "
+                            "saved itself (battery save) is kept either way.",
+                            color=t.sub, font_family=family(), width=420),
+            actions=[btn("Cancel", stay), btn("Leave without saving", leave),
+                     btn("Save and leave", save_and_leave, primary=True)],
+            actions_alignment=ft.MainAxisAlignment.END,
+        ))
 
     # ------------------------------------------------------------------ helpers
     def toast(self, message: str) -> None:

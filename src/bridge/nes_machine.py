@@ -30,6 +30,10 @@ class NESMachine(Machine):
     def title_info(self) -> str:
         return str(self.core.cart)
 
+    def state_blobs(self) -> list:
+        cart = self.core.cart
+        return [cart.prg] + ([] if cart.chr_ram else [cart.chr])
+
     def run_frame(self, render: bool = True) -> None:
         ppu = self.core.ppu
         ppu.skip_render = not render

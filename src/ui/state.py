@@ -23,7 +23,7 @@ class UIState:
     draft_keyboards: dict[str, dict[str, list[str]]] | None = None   # system -> button -> keys
     draft_hotkeys: dict[str, str] | None = None
     # moments
-    moments_filter: str = "all"      # all | CLIP | GIF | SHOT
+    moments_filter: str = "all"      # all | GIF | SHOT
     moments_sel: str | None = None   # path
     moments_fmt: str = "MP4"
     moments_size: str = "4x"

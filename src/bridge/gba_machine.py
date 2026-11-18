@@ -73,6 +73,10 @@ class GBAMachine(Machine):
         h = self.core.cart.header
         return f"{h.title} [{h.game_code}]"
 
+    def state_blobs(self) -> list:
+        core = self.core
+        return [core.cart.rom, core.bus.rom, core.bus.bios]
+
     # ------------------------------------------------------------------ running
     def run_frame(self, render: bool = True) -> None:
         ppu = self.core.ppu

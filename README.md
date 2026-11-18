@@ -21,11 +21,14 @@
 
 <p align="center">
   <a href="#-quick-start">Quick start</a> ·
+  <a href="#-using-the-app">Using the app</a> ·
   <a href="#-the-four-cores">Cores</a> ·
   <a href="#-controls">Controls</a> ·
+  <a href="#-save-states-rewind-and-recording">Save states</a> ·
   <a href="#-speed">Speed</a> ·
   <a href="#-how-it-works">How it works</a> ·
   <a href="#-tests">Tests</a> ·
+  <a href="#-faq-and-troubleshooting">FAQ</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
@@ -62,6 +65,12 @@
   - Each system has its own key layout.
   - Gamepads and touch controls are supported.
 - **Battery saves that just work.** Each game gets its own folder under `saves/`. Saves are written atomically, about every 10 seconds and again when you quit.
+- **Save states, on every core.** Four slots per game plus a resume point. Leaving a game pauses it and offers to save first. States from this session load instantly.
+- **Rewind.** Hold `R` to go back up to 30 seconds.
+- **Recording and instant replay.**
+  - Record gameplay as a GIF.
+  - "Clip last 30s" saves what just happened, without having to be recording.
+  - Both land in **Moments**, next to your screenshots.
 
 ---
 
@@ -123,6 +132,88 @@ Prebuilt **Windows** and **Linux** apps are attached to every [release](https://
 
 ---
 
+## 🖥 Using the app
+
+### Library
+
+- Every game found in your ROM folders appears as a card with a cover. Games you haven't played yet get an auto-generated preview, which is swapped for your last frame once you play.
+- **Search** with `Ctrl+K`.
+- **Filter** by console in the sidebar, or open **Favorites**. Sort by last played, title or system.
+- **Continue playing** at the top shows your most recent game:
+  - **Resume** starts it fresh from its battery save.
+  - **Load resume point** / **Load slot N** opens it at its newest save state.
+- **Add ROMs** opens a file picker (desktop). **Save states** in the sidebar opens your saves folder.
+
+### Player
+
+```text
+┌ ← Library  Game title [NES]   ⏸ ⏪ ⏩ ⟲ │ 📷  ● Record  ⟲ Clip last 30s │ ⛶ ┐
+│                                             ┌ Save states ────────────┐ │
+│                                             │ [thumb] Slot 1 · 2m ago ● │ │
+│              game screen                    │ [     ] Slot 2 · Empty    │ │
+│                                             │ [ Save ]       [ Load ]   │ │
+│                                             │ Resume point · 1h ago     │ │
+│                                             │ Rewind: hold R · 18 s     │ │
+│                                             │ Speed  1× 2× 4× 8×        │ │
+│                                             └───────────────────────────┘ │
+└ ● Running  60 FPS · game 100%  Slot 1  Replay buffer 30 s  ● REC          ┘
+```
+
+- **Toolbar:** pause, rewind, fast-forward, reset, screenshot, **Record** (shows a running timer while recording), **Clip last 30s**, fullscreen.
+- **Save states panel:**
+  - Pick a slot (1–4), then **Save** or **Load**. Each slot shows a thumbnail and how long ago it was saved.
+  - The **Resume point** is the state written by **Save and leave**.
+  - Below the slots: how many seconds of rewind are ready, and the speed picker.
+- **Footer:** frames drawn per second next to the real game speed. With auto-frameskip, the game can run at 100% while fewer frames are drawn.
+- **Leaving:** going back to the library, or to another screen from the pause menu, pauses the game and asks **Save and leave · Leave without saving · Cancel**. The game's own battery save is written either way.
+- **Touch screens** get an on-screen pad. Shoulder buttons appear only for GBA.
+
+### Moments
+
+Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest first. Filter by **Recordings & clips** or **Screenshots**. GIFs play in the preview. For a selected moment you can **Export** it, **Copy to clipboard**, **Show in folder** or **Delete** it.
+
+### Settings
+
+| Section | What's there |
+|---|---|
+| **Controls** | A separate keyboard layout for each of GB, GBC, GBA and NES (pick one under **Layout for**). Click a binding, then press a key; a key already in use moves to the new action. Also the gamepad layout and every hotkey. |
+| **Audio** | Volume. Sound plays through SDL in the desktop app. |
+| **Paths & saves** | ROM folders to scan, and the save folder (change it, open it, or reset it to the default). |
+
+**Appearance** (*Themes & screen*):
+
+- Four app themes: Daylight, Midnight, DMG Green, Berry. Optionally match the theme to the console, or follow the system's light/dark mode.
+- Screen shaders: pixel-perfect, LCD grid, CRT scanlines, smooth, soft.
+- Original Game Boy palettes.
+- GBC/GBA LCD colour correction, integer scaling and frame blending.
+
+### Where your files live
+
+| What | Where |
+|---|---|
+| Your ROMs | `rom/gb`, `rom/gb_color`, `rom/gba`, `rom/nes`, or any folder you add |
+| Battery saves | `saves/<console>/<game>/<game>.sav` (`gb`, `gbc`, `gba` or `nes`) |
+| Save states | `saves/<console>/<game>/states/slot<N>.state` (+ `.png` thumbnail) |
+| Screenshots, recordings, clips | `~/.gba_python/moments/` |
+| Settings, covers | `~/.gba_python/` (the app storage folder when packaged) |
+
+### Feature status
+
+| Feature | Status |
+|---|---|
+| GB / GBC / GBA / NES emulation, sound, gamepads, touch | ✅ |
+| Battery saves (one folder per console and game) | ✅ |
+| Save states: 4 slots + resume point, on all four cores | ✅ |
+| Save prompt when leaving a game | ✅ |
+| Rewind (30 s) | ✅ |
+| Fast-forward (2×, 4×, 8×, hold `F`) | ✅ |
+| Screenshots | ✅ |
+| GIF recording, clip of the last 30 s | ✅ (silent GIFs) |
+| Cheats, achievements, link play | 🚧 UI preview, not in the cores yet |
+| MP4 / WebM export with sound | 🚧 not yet |
+
+---
+
 ## 🎮 The four cores
 
 | | Game Boy | Game Boy Color | Game Boy Advance | NES |
@@ -174,9 +265,71 @@ The file extension picks the core. Together, the supported NES mappers cover mos
 | L / R *(GBA)* | Q / E | A / S | LB / RB or triggers |
 | Start | Enter | Enter | Menu |
 | Select | Backspace | Right Shift / Backspace | View |
-| Fast-forward | F | | |
 
-GB, GBC, GBA and NES each keep their **own** layout under **Settings → Controls**. Keyboard, Xbox / PlayStation / Switch-style pads, and the on-screen touch pad all feed one input router. Taps shorter than a frame still register.
+| Hotkey (desktop app) | Default |
+|---|---|
+| Fast-forward (hold) | `F` |
+| Rewind (hold) | `R` |
+| Pause / resume | `P` |
+| Quick save / quick load (current slot) | `F1` / `F4` |
+| Previous / next slot | `[` / `]` |
+| Clip the last 30 s | `F9` |
+| Start / stop recording | `F10` |
+| Fullscreen | `F11` |
+| Screenshot | `F12` |
+
+GB, GBC, GBA and NES each keep their **own** layout under **Settings → Controls**, and every hotkey can be rebound there. Keyboard, Xbox / PlayStation / Switch-style pads, and the on-screen touch pad all feed one input router. Taps shorter than a frame still register.
+
+---
+
+## 💾 Save states, rewind and recording
+
+Save states and battery saves live together in the game's folder:
+
+```text
+saves/nes/My Game/
+├── My Game.sav            battery save (what the game itself saves)
+└── states/
+    ├── slot0.state        resume point ("Save and leave")
+    ├── slot1.state        quick-save slots 1–4
+    └── slot1.png          thumbnail shown in the Saves panel
+```
+
+| Feature | How it works |
+|---|---|
+| **Save states** | The whole core is pickled, minus the ROM and BIOS, so a state is only a few KB to a few tens of KB. A state saved this session reloads instantly, straight into the running game. A state from an earlier session loads into a fresh core. |
+| **Safe loading** | States load with a restricted unpickler that only allows the emulator's own classes, so a shared `.state` file can't run code. A state from another game or console is refused. |
+| **Leaving a game** | The game pauses and asks: **Save and leave**, **Leave without saving**, or **Cancel**. **Continue playing** in the library then offers **Load resume point**. |
+| **Rewind** | A snapshot is taken every 6 frames and kept for 30 s, compressed in memory. Holding rewind walks back about 3× faster than real time, with the sound muted. |
+| **Recording** | Frames are compressed as they arrive, at 30 fps, and the GIF is encoded on a background thread when you stop. GIFs have no sound. |
+| **Clip last 30s** | A rolling 30 s replay buffer (can be turned off in the player). Saving a clip never interrupts the game. |
+
+```mermaid
+sequenceDiagram
+    participant UI as Player (UI thread)
+    participant R as EmulatorRunner (worker)
+    participant S as savestate
+    participant C as Core
+    UI->>R: submit(save slot 1)
+    Note over R: runs between two frames, never mid-instruction
+    R->>S: capture(machine)
+    S->>C: pickle the core (ROM/BIOS by reference, closures left out)
+    S-->>R: snapshot in memory + slot1.state on disk
+    R-->>UI: Future resolved → "Saved to slot 1"
+    UI->>R: submit(load slot 1)
+    alt saved in this session
+        S->>C: copy the state back into the live objects (instant)
+    else from an earlier session
+        S->>C: restricted unpickle → fresh core, helpers rebuilt
+    end
+```
+
+Rewind and the replay buffer cost about 2% of frame time on GB and GBA, and about 9% on NES, which has roughly 3× headroom.
+
+The features live in `src/bridge/savestate/`, `src/bridge/rewind/` and `src/bridge/recorder/`. The cores' side is in `src/core/adaptors/`:
+
+- `snapshot/` is how a core marks the helpers that can't be pickled (generated opcode closures, memoryviews, code caches) and rebuilds them after a load.
+- `saves/` decides where battery saves go.
 
 ---
 
@@ -218,6 +371,7 @@ flowchart LR
         R["EmulatorRunner<br/>worker thread · audio-clock pacing · auto-frameskip"]
         M{{"Machine API<br/>run_frame · press · frame_rgb · apu"}}
         I["Input router<br/>keyboard · gamepad · touch"]
+        SS["savestate · rewind · recorder"]
     end
     subgraph Cores["src/core"]
         GB[gameboy<br/>DMG + CGB]
@@ -226,6 +380,7 @@ flowchart LR
     end
     P --> R --> M
     I --> R
+    R --- SS
     M --> GB & GBA & NES
     R -- "frames (async)" --> P
     R -- "int16 stereo 44.1 kHz" --> A[(SDL audio)]
@@ -250,7 +405,12 @@ main.py                  launcher and flet build entry
 src/core/gameboy/        DMG and CGB
 src/core/gba/            ARM, PPU, APU, DMA, timers, HLE BIOS, RTC
 src/core/nes/            6502 CPU, PPU, APU, mappers, cartridge
+src/core/adaptors/saves/     where battery saves live (per console, per game)
+src/core/adaptors/snapshot/  save-state hooks the cores implement
 src/bridge/              Machine API, EmulatorRunner, keyboard / gamepad / touch adaptors
+src/bridge/savestate/    save states: in-memory snapshots, state files, slots
+src/bridge/rewind/       rewind ring buffer
+src/bridge/recorder/     GIF recording and the 30 s replay buffer
 src/ui/                  Flet app (library, player, settings, themes)
 tests/roms/              open test ROMs: blargg, Acid2, jsmolka, nes-test-roms
 docs/                    README media and make_media.py
@@ -298,9 +458,50 @@ Push a tag like `v0.2.0` and GitHub Actions builds both apps and publishes them 
 
 ## 🧭 Honest limits
 
-- Save states, rewind, video, clips, cheats, achievements and link play have buttons in the UI, but the cores don't snapshot yet. The buttons say so.
+- Cheats, achievements and link play are UI previews for now; the cores don't implement them yet.
+- Recordings and clips are silent GIFs. There is no MP4 export with sound yet.
 - Sound uses SDL through pygame, so it works in the desktop app only.
 - The NES core is NTSC only. PAL and mappers beyond the ones listed above are welcome contributions.
+
+---
+
+## ❓ FAQ and troubleshooting
+
+<details>
+<summary><b>Where do I get games?</b></summary>
+
+From cartridges you own: dump them with a cartridge reader. This project doesn't ship or link to ROMs. Homebrew and the open test ROMs in `tests/roms/` are a good way to try it.
+</details>
+
+<details>
+<summary><b>Will a save state from an older version still load?</b></summary>
+
+Each state records a format version and the ROM it came from, and both are checked on load. If a core's internals change a lot between versions, an old state may be refused. The game's own battery save is never affected.
+</details>
+
+<details>
+<summary><b>Is it safe to load a .state file someone sent me?</b></summary>
+
+States load with a restricted unpickler that only rebuilds the emulator's own classes, and anything else in the file is refused before it can run. The test suite includes a malicious state to check this.
+</details>
+
+<details>
+<summary><b>The FPS counter says 30, but the game feels full speed.</b></summary>
+
+That's auto-frameskip. The footer shows *frames drawn* and *game speed* separately. When drawing can't keep up, as in heavy GBA scenes, the game and its sound still run at 100% and fewer frames are drawn.
+</details>
+
+<details>
+<summary><b>No sound.</b></summary>
+
+Sound needs SDL through pygame, which `uv sync` installs on desktop. Check the volume in the player's side panel or under **Settings → Audio**, and that your output device works in other apps.
+</details>
+
+<details>
+<summary><b>My keys work for one console but not another.</b></summary>
+
+Each console has its own layout. Open **Settings → Controls**, pick the console under **Layout for**, and rebind there.
+</details>
 
 ---
 

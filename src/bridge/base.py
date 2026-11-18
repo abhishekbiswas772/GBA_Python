@@ -100,6 +100,16 @@ class Machine:
         ``SAMPLE_RATE`` Hz, with a settable ``sampling`` flag)."""
         raise NotImplementedError
 
+    # ------------------------------------------------------------------ save states
+    def state_blobs(self) -> list:
+        """Big read-only buffers (ROM, BIOS) left out of save states and passed
+        by reference; the first one identifies the game."""
+        return []
+
+    def adopt_core(self, core) -> None:
+        """Replace the running core with one restored from a save-state file."""
+        self.core = core
+
     # ------------------------------------------------------------------ lifecycle
     def save(self) -> bool:
         """Flush battery RAM to disk; returns True if a save was written."""

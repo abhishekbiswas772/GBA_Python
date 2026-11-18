@@ -1,3 +1,4 @@
+from src.core.adaptors.snapshot import Snapshottable
 from src.core.gameboy.common import (
     FLAG_C, FLAG_H, FLAG_N, FLAG_Z, 
     R8, R16, R16_STACK,
@@ -5,7 +6,10 @@ from src.core.gameboy.common import (
 )
 
 
-class CPU:
+class CPU(Snapshottable):
+    # decoded opcode tables are closures over this CPU (see src/core/adaptors/snapshot)
+    _NOT_STATE = ("ops", "cb_ops")
+
     def __init__(self, mmu):
         self.mmu = mmu
         self.a, self.f = 0x01, 0xB0
@@ -20,8 +24,11 @@ class CPU:
         self.halted = False
         self.halt_bug = False
 
-        self.ops = [self._decode(op) for op in range(256)]        
-        self.cb_ops = [self._decode_cb(op) for op in range(256)]  
+        self._rebuild_transient()
+
+    def _rebuild_transient(self) -> None:
+        self.ops = [self._decode(op) for op in range(256)]
+        self.cb_ops = [self._decode_cb(op) for op in range(256)]
 
     def step(self) -> int:
         if self.halted:

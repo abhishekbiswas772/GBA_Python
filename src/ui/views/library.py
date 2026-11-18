@@ -86,7 +86,8 @@ def build(app: "App") -> ft.Control:
         c.nav_item(t, "Favorites", lambda e: set_filter("fav"), icon_name=ft.Icons.STAR_OUTLINE,
                    selected=ui.lib_filter == "fav",
                    trailing=c.mono(str(len(app.settings.favorites)), t) if app.settings.favorites else None),
-        c.nav_item(t, "Save states", lambda e: app.not_ready("Save states"), icon_name=ft.Icons.SAVE_OUTLINED),
+        c.nav_item(t, "Save states", lambda e: app.open_folder(app.settings.apply_save_dir() or app.settings.save_folder()),
+                   icon_name=ft.Icons.SAVE_OUTLINED),
     ]
     bottom = [
         c.nav_item(t, "Themes & screen", lambda e: app.go("appearance"), icon_name=ft.Icons.PALETTE_OUTLINED),
@@ -244,7 +245,7 @@ def _continue_card(app: "App", add_roms, main_w: float) -> ft.Control:
         ft.Row([
             c.button([c.icon(ft.Icons.PLAY_ARROW, t.bg, 16), c.text("Resume" if recent else "Play", weight=600, color=t.bg)],
                      lambda e: app.play(g), t, variant="inverse", h_pad=20),
-            c.button("Load state…", lambda e: app.not_ready("Save states"), t),
+            _load_state_button(app, g),
         ], spacing=10, wrap=True),
     ], spacing=12, tight=True)
     content = ft.Row([screen, ft.Container(info, expand=True)], spacing=24,
@@ -365,3 +366,15 @@ def app_name() -> str:
 def app_version() -> str:
     from src.ui.app import VERSION
     return VERSION
+
+
+def _load_state_button(app: "App", g) -> ft.Control:
+    """Open the game at its newest save state (the resume point or a numbered slot)."""
+    from src.bridge.savestate import SlotStore
+    t = app.t
+    latest = SlotStore(g.path, g.system.lower()).latest() if g.playable else None
+    if latest is None:
+        return c.button("No save state yet", None, t, disabled=True)
+    label = "Load resume point" if latest["slot"] == 0 else f"Load slot {latest['slot']}"
+    return c.button(f"{label} · {lib.ago(latest['time'], '')}",
+                    lambda e: app.play(g, load_slot=latest["slot"]), t)

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core import saves
+from src.core.adaptors import saves
 from src.core.gameboy.cartridge import Cartridge as GBCart
 from src.core.nes.cartridge import Cartridge as NESCart
 

@@ -19,6 +19,7 @@ previously-fetched opcode once; it is refetched (and sees the new value) only
 afterwards. Any non-sequential fetch (branch, exception) flushes the buffer,
 matching the hardware pipeline flush.
 """
+from src.core.adaptors.snapshot import Snapshottable
 from src.core.gba.common import (
     M32, MODE_USR, MODE_FIQ, MODE_IRQ, MODE_SVC, MODE_UND, MODE_SYS, MODE_BANK,
     VEC_UNDEF, VEC_SWI, VEC_IRQ,
@@ -50,7 +51,25 @@ def _sext(value: int, bits: int) -> int:
     return (value ^ m) - m
 
 
-class CPU:
+class CPU(Snapshottable):
+    # generated code and its namespace are closures over this CPU and the bus
+    # (see src/core/adaptors/snapshot)
+    _NOT_STATE = ("arm_cache", "thumb_cache", "_make_cache", "_ns")
+
+    def _rebuild_transient(self) -> None:
+        bus = self.bus
+        self.arm_cache = {}
+        self.thumb_cache = [None] * 65536
+        self._make_cache = {}
+        self._ns = {
+            "cpu": self, "r": self.r, "M": M32,
+            "R8": bus.R8, "R16": bus.R16, "R32": bus.R32,
+            "W8": self._wrap_writes(bus.W8, 1),
+            "W16": self._wrap_writes(bus.W16, 2),
+            "W32": self._wrap_writes(bus.W32, 4),
+            "WT32": bus.wait32, "WT16": bus.wait16,
+        }
+
     def __init__(self, bus):
         self.bus = bus
         self.r = [0] * 16
@@ -72,19 +91,9 @@ class CPU:
         self.intrwait = False           # HLE IntrWait re-entry (flags already discarded)
         self.bios_latch = 0
         self.hle_swi = None             # callable(cpu, n) -> cycles, or None = real BIOS
-        self.arm_cache = {}
-        self.thumb_cache = [None] * 65536
-        self._make_cache = {}
         self.stale = {}            # prefetched slots: addr -> opcode fetched before a store
         self._pf_next = 0          # next fetch addr if execution stays sequential
-        self._ns = {
-            "cpu": self, "r": self.r, "M": M32,
-            "R8": bus.R8, "R16": bus.R16, "R32": bus.R32,
-            "W8": self._wrap_writes(bus.W8, 1),
-            "W16": self._wrap_writes(bus.W16, 2),
-            "W32": self._wrap_writes(bus.W32, 4),
-            "WT32": bus.wait32, "WT16": bus.wait16,
-        }
+        self._rebuild_transient()  # code caches + generated-code namespace
 
     # ------------------------------------------------------------ prefetch / SMC
     def _wrap_writes(self, table: list, size: int):

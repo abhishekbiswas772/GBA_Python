@@ -24,7 +24,7 @@ def pytest_addoption(parser):
 def _isolated_save_folder(tmp_path, monkeypatch):
     """Tests never write to the real ./saves: the save folder points at a temp dir,
     and the cores go back to "next to the ROM" after every test."""
-    from src.core import saves
+    from src.core.adaptors import saves
     from src.ui.data import settings
     monkeypatch.setattr(settings.Settings, "save_folder", lambda self: tmp_path / "saves")
     yield

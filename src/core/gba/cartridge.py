@@ -10,7 +10,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.core.saves import sav_path_for
+from src.core.adaptors.saves import sav_path_for
 
 from src.core.gba.rtc import RTC
 from src.core.gba.common import (

@@ -30,6 +30,16 @@ runs the next frames with ``render=False``. Game logic and audio stay at
 100% speed, and only the number of drawn frames drops. At most ``MAX_SKIP``
 frames in a row are skipped, so the picture keeps moving.
 
+Rewind, save states, recording
+------------------------------
+Every ``INTERVAL`` emulated frames a snapshot goes into ``runner.rewind``
+(:mod:`src.bridge.rewind`).  ``set_rewinding(True)`` walks back through them,
+silent and about 3x faster than real time.  Every drawn frame is offered to
+``runner.recorder`` (:mod:`src.bridge.recorder`) for GIF recording and the
+"last 30 s" clip buffer.  ``submit(fn)`` runs ``fn(machine)`` on the worker
+between two frames and returns a Future; save states use it so nothing ever
+touches a core mid-frame.
+
 Input
 -----
 Presses and releases are queued and applied at the start of the next frame,
@@ -43,15 +53,19 @@ import queue
 import threading
 import time
 from array import array
+from concurrent.futures import Future
 from dataclasses import dataclass
 
 from src.bridge.base import Machine, normalize_button
+from src.bridge.recorder import Recorder
+from src.bridge.rewind import RewindBuffer
 
 AUDIO_TARGET = 0.095        # seconds of audio kept queued (latency / jitter cushion)
 AUDIO_LOW = 0.060           # below this the worker is behind: skip drawing (measured:
                             # 35 ms gave ~7 underruns/s in heavy GBA scenes, 55-70 ms ~0)
 MAX_SKIP = 3                # never skip more than this many frames in a row
 FF_MULTIPLIER = 4           # frames per tick while the fast-forward hotkey is held
+REWIND_STEPS_PER_SECOND = 30   # snapshots walked back per second while rewinding
 
 
 @dataclass(frozen=True)
@@ -86,7 +100,8 @@ class _Volume:
 
 
 class EmulatorRunner:
-    def __init__(self, factory, *, audio: bool = True, palette=None, name: str = "emulator"):
+    def __init__(self, factory, *, audio: bool = True, palette=None, name: str = "emulator",
+                 rewind: bool = True, replay: bool = True):
         """``factory()`` builds the Machine. It is called in the worker
         thread, so a slow ROM load never blocks the UI."""
         self._factory = factory
@@ -105,6 +120,11 @@ class EmulatorRunner:
         self.speed = 1                          # 1, 2, 4, 8 x
         self.fast_forward = False
         self.on_frame = None                    # optional callable(Frame), called in the worker
+        self.frames = 0                         # emulated frames since start
+        self.rewind: RewindBuffer | None = None
+        self._want_rewind = rewind
+        self.rewinding = False
+        self.recorder = Recorder(replay=replay)
         self._stop = False
         self._seq = 0
 
@@ -140,6 +160,20 @@ class EmulatorRunner:
     def reset(self) -> None:
         self._q.put(("reset",))
 
+    def set_rewinding(self, on: bool) -> None:
+        """Hold to rewind: walk back through recent snapshots until released."""
+        self._q.put(("rewind", bool(on)))
+
+    def submit(self, fn) -> Future:
+        """Run ``fn(machine)`` on the emulator thread between two frames (works
+        while paused). The Future resolves to its result or raises its error."""
+        fut: Future = Future()
+        if not self._thread.is_alive() and self.ready.is_set():
+            fut.set_exception(RuntimeError("the emulator is not running"))
+            return fut
+        self._q.put(("call", fn, fut))
+        return fut
+
     def close(self, timeout: float = 3.0) -> None:
         """Stop the worker; it saves battery RAM and closes audio on the way out."""
         self._stop = True
@@ -162,6 +196,8 @@ class EmulatorRunner:
             return
         if self._want_audio:
             self.audio = _open_audio(self.machine.apu)
+        if self._want_rewind:
+            self.rewind = RewindBuffer(self.machine.fps)
         self._publish()                              # first (blank) frame right away
         self.ready.set()
         try:
@@ -185,6 +221,10 @@ class EmulatorRunner:
             deferred = self._drain(held)
             if self._stop:
                 break
+            if self.rewinding and not self.error:
+                self._rewind_step()
+                next_t = time.perf_counter()
+                continue
             if self.paused or self.error:
                 time.sleep(0.02)
                 next_t = time.perf_counter()
@@ -203,6 +243,13 @@ class EmulatorRunner:
 
             for i in range(n):
                 m.run_frame(render=draw and i == n - 1)
+            self.frames += n
+            if self.rewind is not None and self.rewind.enabled:
+                try:
+                    self.rewind.tick(m, n)
+                except Exception as e:                # a core that can't snapshot: no rewind,
+                    self.rewind.enabled = False       # but the game keeps running
+                    print(f"[runner] rewind disabled: {type(e).__name__}: {e}")
             # quick taps: a key pressed and released before this frame ran is
             # released only now, after the game has seen it for one frame
             for name in deferred:
@@ -291,13 +338,52 @@ class EmulatorRunner:
                 m.reset()                             # saves battery RAM first
                 held.clear()
                 deferred.clear()
-                if self.audio is not None:
-                    self.audio.retarget(m.apu)
+                self._core_changed()
+            elif op == "rewind":
+                on = cmd[1] and self.rewind is not None and len(self.rewind) > 0
+                if on != self.rewinding:
+                    self.rewinding = on
+                    for name in list(held):           # no stuck buttons across time
+                        _safe(m.release, name)
+                    held.clear()
+                    deferred.clear()
+                    if self.audio is not None:
+                        self.audio.halt()
+            elif op == "call":
+                fn, fut = cmd[1], cmd[2]
+                if fut.set_running_or_notify_cancel():
+                    core = m.core
+                    try:
+                        fut.set_result(fn(m))
+                    except BaseException as e:
+                        fut.set_exception(e)
+                    if m.core is not core:            # a state file replaced the core
+                        self._core_changed()
+                    self._publish()
             elif op == "quit":
                 self._stop = True
                 return deferred
 
-    def _publish(self) -> None:
+    def _core_changed(self) -> None:
+        """The machine got a new core object (reset / state loaded from disk)."""
+        if self.audio is not None:
+            self.audio.retarget(self.machine.apu)
+        if self.rewind is not None:
+            self.rewind.clear()
+
+    def _rewind_step(self) -> None:
+        t0 = time.perf_counter()
+        m = self.machine
+        if self.rewind is None or not self.rewind.step_back(m):
+            self.rewinding = False
+            return
+        m.apu.take_samples()                          # rewinding is silent
+        self._publish(feed=False)
+        delay = 1.0 / REWIND_STEPS_PER_SECOND - (time.perf_counter() - t0)
+        if delay > 0:
+            time.sleep(delay)
+
+    def _publish(self, feed: bool = True) -> None:
         m = self.machine
         if m.system == "GB":
             rgb = m.frame_rgb(self._palette) if self._palette is not None else m.frame_rgb()
@@ -306,6 +392,11 @@ class EmulatorRunner:
         self._seq += 1
         frame = Frame(self._seq, rgb, m.width, m.height)
         self.latest = frame                           # atomic reference swap
+        if feed:
+            try:
+                self.recorder.feed(rgb, m.width, m.height, self.frames)
+            except Exception:
+                pass
         cb = self.on_frame
         if cb is not None:
             try:
@@ -314,6 +405,13 @@ class EmulatorRunner:
                 pass
 
     def _shutdown(self) -> None:
+        while True:                                   # never leave a submit() hanging
+            try:
+                cmd = self._q.get_nowait()
+            except queue.Empty:
+                break
+            if cmd[0] == "call" and cmd[2].set_running_or_notify_cancel():
+                cmd[2].set_exception(RuntimeError("the emulator stopped"))
         if self.audio is not None:
             try:
                 self.audio.close()

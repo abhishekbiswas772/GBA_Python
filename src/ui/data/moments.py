@@ -1,4 +1,4 @@
-"""Moments: screenshots (and, later, clips/GIFs) saved from the player.
+"""Moments: screenshots, GIF recordings and clips saved from the player.
 
 Files live in <data dir>/moments. The file name carries the game and system so the
 gallery can show "Title · GB · 2 h ago" without a database:
@@ -62,7 +62,7 @@ def list_moments() -> list[Moment]:
             created = float(parts[2]) if len(parts) > 2 else p.stat().st_mtime
         except ValueError:
             created = p.stat().st_mtime
-        label = {"SHOT": "Screenshot", "GIF": "GIF", "CLIP": "Clip"}[kind]
+        label = {"SHOT": "Screenshot", "GIF": "Recording", "CLIP": "Clip"}[kind]
         out.append(Moment(str(p), f"{label} · {time.strftime('%H:%M', time.localtime(created))}",
                           game, system, kind, created))
     return sorted(out, key=lambda m: -m.created)

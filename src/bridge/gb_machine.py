@@ -57,6 +57,9 @@ class GameBoyMachine(Machine):
         self._palette = tuple(tuple(c) for c in palette) if palette is not None else None
         self.core = GameBoy(path, cgb=cgb)
 
+    def state_blobs(self) -> list:
+        return [self.core.cart.rom]
+
     # ------------------------------------------------------------------ info
     @property
     def system(self) -> str:

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from src.ui.app import App
 
 NATIVE = {"GB": (160, 144), "GBC": (160, 144), "GBA": (240, 160), "NES": (256, 240)}
-SLOT_KEYS = {1: "F1", 2: "F2", 3: "F3", 4: "—"}
+VISIBLE_SLOTS = (1, 2, 3, 4)          # slot 0 is the resume point saved when you leave
 
 
 def norm_key(key: str) -> str:
@@ -88,6 +88,89 @@ def _build(app: "App", s) -> ft.KeyboardListener:
         app.page.window.full_screen = not app.page.window.full_screen
         app.page.update()
 
+    # ---------------------------------------------------------------- save states
+    def quick_save(e=None) -> None:
+        async def go() -> None:
+            try:
+                await s.save_state(s.slot)
+                app.toast(f"Saved to slot {s.slot}")
+            except Exception as err:
+                app.toast(f"Couldn't save: {err}")
+            app.render()
+        app.page.run_task(go)
+
+    def quick_load(e=None, slot: int | None = None) -> None:
+        n = s.slot if slot is None else slot
+
+        async def go() -> None:
+            try:
+                await s.load_state(n)
+                app.toast("Loaded the resume point" if n == 0 else f"Loaded slot {n}")
+            except FileNotFoundError:
+                app.toast(f"Slot {n} is empty" if n else "No resume point yet")
+            except Exception as err:
+                app.toast(f"Couldn't load: {err}")
+            app.render()
+        app.page.run_task(go)
+
+    # ---------------------------------------------------------------- rewind
+    def rewind_burst(e=None) -> None:
+        """Toolbar button: rewind for a moment (hold the hotkey for longer)."""
+        if not s.rewind_seconds:
+            app.toast("Nothing to rewind yet")
+            return
+        s.set_rewinding(True)
+
+        async def stop() -> None:
+            await asyncio.sleep(1.5)
+            s.set_rewinding(False)
+        app.page.run_task(stop)
+
+    # ---------------------------------------------------------------- recording
+    def gif_done(path, err) -> None:              # encoder thread -> UI loop
+        async def show() -> None:
+            if err is not None:
+                app.toast(f"Couldn't save the GIF: {err}")
+                return
+            ui.toast = str(path)
+            if app.route == "player":
+                app.render()
+            else:
+                app.toast("GIF saved to Moments")
+        try:
+            app.page.run_task(show)
+        except Exception:
+            pass
+
+    def toggle_record(e=None) -> None:
+        if s.recording:
+            s.stop_recording(on_done=gif_done)
+            app.toast("Recording saved; encoding the GIF…")
+        else:
+            s.start_recording()
+            app.toast("Recording… press again to stop")
+            app.page.run_task(record_timer)
+        app.render()
+
+    async def record_timer() -> None:
+        while s.recording and app.session is s:
+            secs = int(s.runner.recorder.recorded_seconds)
+            rec_label.value = f"Stop {secs // 60}:{secs % 60:02d}"
+            try:
+                rec_label.update()
+            except Exception:
+                pass
+            await asyncio.sleep(0.5)
+
+    def clip(e=None) -> None:
+        if not settings.replay_buffer:
+            app.toast("Turn on the replay buffer to clip the last 30 s")
+            return
+        if s.clip(30, on_done=gif_done):
+            app.toast("Saving the last 30 s as a GIF…")
+        else:
+            app.toast("Nothing to clip yet")
+
     def open_moment(e=None) -> None:
         ui.moments_sel = ui.toast
         ui.toast = None
@@ -103,9 +186,11 @@ def _build(app: "App", s) -> ft.KeyboardListener:
     key_to_hot = {norm_key(v): k for k, v in settings.hotkeys.items() if v}
     hot_actions = {
         "pause": toggle_pause, "screenshot": screenshot, "fullscreen": toggle_fullscreen,
-        "rewind": lambda: app.not_ready("Rewind"),
-        "quick_save": lambda: app.not_ready("Save states"),
-        "quick_load": lambda: app.not_ready("Save states"),
+        "rewind": lambda: s.set_rewinding(True),
+        "quick_save": quick_save,
+        "quick_load": quick_load,
+        "record": toggle_record,
+        "clip": clip,
         "next_slot": lambda: set_slot(s.slot % 4 + 1),
         "prev_slot": lambda: set_slot((s.slot - 2) % 4 + 1),
     }
@@ -117,6 +202,9 @@ def _build(app: "App", s) -> ft.KeyboardListener:
         act = key_to_hot.get(k)
         if act == "fast_forward":
             s.fast_forward = True
+        elif act == "rewind":
+            if not s.rewinding:
+                s.set_rewinding(True)
         elif act in hot_actions:
             hot_actions[act]()
 
@@ -124,27 +212,35 @@ def _build(app: "App", s) -> ft.KeyboardListener:
         k = norm_key(e.key)
         if keys.key_up(e.key):
             return
-        if key_to_hot.get(k) == "fast_forward":
+        act = key_to_hot.get(k)
+        if act == "fast_forward":
             s.fast_forward = False
+        elif act == "rewind":
+            s.set_rewinding(False)
 
     # ---------------------------------------------------------------- header
     def tool(icon_name, label, handler):
         return c.icon_button(icon_name, handler, t, label, size=18)
 
     rec_color = t.rec
+    rec_label = c.text("Stop 0:00" if s.recording else "Record", size=13, weight=600, kind="mono",
+                       color=rec_color if s.recording else t.text)
+    if s.recording:
+        app.page.run_task(record_timer)
     toolbar = ft.Container(ft.Row([
         tool(ft.Icons.PLAY_ARROW if s.paused else ft.Icons.PAUSE, "Resume" if s.paused else "Pause", toggle_pause),
-        tool(ft.Icons.FAST_REWIND, f"Rewind (hold {settings.hotkeys['rewind']})", lambda e: app.not_ready("Rewind")),
+        tool(ft.Icons.FAST_REWIND, f"Rewind (hold {settings.hotkeys['rewind']})", rewind_burst),
         tool(ft.Icons.FAST_FORWARD, f"Fast forward (hold {settings.hotkeys['fast_forward']})",
              lambda e: set_speed("1" if s.speed > 1 else "2")),
         tool(ft.Icons.RESTART_ALT, "Reset", reset),
         c.divider_v(t),
         tool(ft.Icons.PHOTO_CAMERA_OUTLINED, f"Screenshot ({settings.hotkeys['screenshot']})", screenshot),
-        c.button([c.dot(rec_color, 10), c.text("Record", size=13, weight=600, kind="mono", color=t.text)],
-                 lambda e: app.not_ready("Video recording"), t, variant="ghost", height=40, h_pad=12, radius=8),
+        c.button([c.dot(rec_color, 10), rec_label],
+                 toggle_record, t, variant="ghost", height=40, h_pad=12, radius=8,
+                 bg=c.alpha(rec_color, 0.14) if s.recording else None),
         c.button([c.icon(ft.Icons.HISTORY, t.text, 16), c.text("Clip last 30s", size=13, weight=600, color=t.text),
-                  c.mono("F9", t, size=11)],
-                 lambda e: app.not_ready("Clips"), t, variant="ghost", height=40, h_pad=12, radius=8),
+                  c.mono(settings.hotkeys.get("clip", ""), t, size=11)],
+                 clip, t, variant="ghost", height=40, h_pad=12, radius=8),
         c.divider_v(t),
         tool(ft.Icons.FULLSCREEN, f"Fullscreen ({settings.hotkeys['fullscreen']})", toggle_fullscreen),
     ], spacing=2, tight=True, wrap=not wide), padding=4, bgcolor=t.bg, border=c.border(t.line), border_radius=10)
@@ -235,7 +331,7 @@ def _build(app: "App", s) -> ft.KeyboardListener:
                        lambda v: (setattr(ui, "player_tab", v), app.render()), t, equal=True)
     panel: list[ft.Control] = [tabs]
     if ui.player_tab == "saves":
-        panel.append(_saves(app, set_slot, set_speed))
+        panel.append(_saves(app, set_slot, set_speed, quick_save, quick_load))
     elif ui.player_tab == "cheats":
         panel.append(_cheats(app))
     else:
@@ -263,11 +359,12 @@ def _build(app: "App", s) -> ft.KeyboardListener:
     def on_replay(v: bool) -> None:
         settings.replay_buffer = v
         settings.save()
+        s.set_replay_buffer(v)
         app.render()
 
     panel.append(ft.Container(ft.Column([
         c.setting_row("Volume", volume, t),
-        c.setting_row("Replay buffer (last 60 s)", c.checkbox(settings.replay_buffer, on_replay, t,
+        c.setting_row("Replay buffer (last 30 s)", c.checkbox(settings.replay_buffer, on_replay, t,
                                                               "Replay buffer"), t),
     ], spacing=12), padding=ft.Padding.only(top=16), border=ft.Border.only(top=ft.BorderSide(1, t.line)),
         margin=ft.Margin.only(top=0)))
@@ -306,8 +403,9 @@ def _build(app: "App", s) -> ft.KeyboardListener:
         c.mono(f"{s.speed * 100}% speed", t), c.mono(f"Slot {s.slot}", t),
     ]
     if settings.replay_buffer:
-        footer_items.append(c.mono("Replay buffer 60 s", t))
-    footer_items.append(c.mono("Link: 1 player", t))
+        footer_items.append(c.mono("Replay buffer 30 s", t))
+    if s.recording:
+        footer_items.append(c.mono("● REC", t, color=t.rec))
     footer = ft.Container(
         ft.Row([ft.Row(footer_items, spacing=22, wrap=True, run_spacing=4, expand=True),
                 c.mono(f"{g.filename} · {lib.human_size(g.size)}", t)], spacing=22),
@@ -321,25 +419,54 @@ def _build(app: "App", s) -> ft.KeyboardListener:
 
 
 def _leave(app: "App", route: str) -> None:
-    """Pause-menu shortcut to another screen. Leaving the player saves battery RAM
-    and ends the session (the core has no save states to resume from)."""
+    """Pause-menu shortcut to another screen (app.go asks to save a state first)."""
     app.go(route)
 
 
 # -------------------------------------------------------------------- panel tabs
-def _saves(app: "App", set_slot, set_speed) -> ft.Control:
-    t, s = app.t, app.session
+def _saves(app: "App", set_slot, set_speed, quick_save, quick_load) -> ft.Control:
+    t, s, hk = app.t, app.session, app.settings.hotkeys
+    info = {e["slot"]: e for e in s.slot_info()}
     rows: list[ft.Control] = [ft.Row([c.heading("Save states", t, 15), ft.Container(expand=True),
-                                      c.text("Not in core yet", size=12, color=t.muted)])]
-    for n in range(1, 5):
+                                      c.text(f"{hk.get('quick_save', '')} save · {hk.get('quick_load', '')} load",
+                                             size=12, color=t.muted)])]
+
+    def thumb(e) -> ft.Control:
+        if e and e["thumb"] is not None:
+            try:
+                return ft.Container(ft.Image(src=e["thumb"].read_bytes(), fit=ft.BoxFit.COVER,
+                                             filter_quality=ft.FilterQuality.NONE),
+                                    width=72, height=48, border_radius=4, clip_behavior=ft.ClipBehavior.HARD_EDGE)
+            except OSError:
+                pass
+        return ft.Container(width=72, height=48, bgcolor=t.screen, border_radius=4)
+
+    def when(e) -> str:
+        return lib.ago(e["time"], "") if e and e["time"] else "Empty"
+
+    for n in VISIBLE_SLOTS:
+        e = info.get(n)
         on = s.slot == n
         rows.append(c.button(ft.Row([
-            ft.Container(width=72, height=48, bgcolor=t.screen, border_radius=4),
+            thumb(e),
             ft.Column([c.text(f"Slot {n}", size=13, weight=600, color=t.text),
-                       c.text("Empty", size=12, color=t.muted)], spacing=3, tight=True, expand=True),
-            c.mono(SLOT_KEYS[n], t, size=11),
-        ], spacing=12), (lambda e, k=n: set_slot(k)), t, variant="ghost", height=64, h_pad=8,
+                       c.text(when(e), size=12, color=t.muted)], spacing=3, tight=True, expand=True),
+            c.mono("●" if on else "", t, size=11, color=t.accent),
+        ], spacing=12), (lambda ev, k=n: set_slot(k)), t, variant="ghost", height=64, h_pad=8,
             bg=t.soft if on else t.card, side=t.accent if on else t.line, align=ft.Alignment.CENTER_LEFT))
+    rows.append(ft.Row([
+        c.button("Save", quick_save, t, variant="primary", height=38, radius=8, expand=1, icon_name=ft.Icons.SAVE),
+        c.button("Load", lambda ev: quick_load(), t, height=38, radius=8, expand=1,
+                 disabled=not (info.get(s.slot) and info[s.slot]["time"])),
+    ], spacing=8))
+    resume = info.get(0)
+    if resume and resume["time"]:
+        rows.append(c.button(ft.Row([c.icon(ft.Icons.HISTORY, t.text, 16),
+                                     c.text(f"Resume point · {when(resume)}", size=13, color=t.text)], spacing=8),
+                             lambda ev: quick_load(slot=0), t, variant="ghost", height=38, radius=8))
+    rw = s.rewind_seconds
+    rows.append(c.text(f"Rewind: hold {hk.get('rewind', '')} · {rw:.0f} s available" if rw else
+                       f"Rewind: hold {hk.get('rewind', '')}", size=12, color=t.muted))
     rows.append(ft.Container(c.heading("Speed", t, 15), margin=ft.Margin.only(top=12)))
     rows.append(c.segmented([(str(v), f"{v}×") for v in (1, 2, 4, 8)], str(s.speed), set_speed, t,
                             mono_font=True, equal=True))

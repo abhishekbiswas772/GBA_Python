@@ -9,6 +9,7 @@ to write-1-to-clear registers (IF) only touch the written byte.
 """
 from array import array
 
+from src.core.adaptors.snapshot import Snapshottable
 from src.core.gba.common import (
     BIOS_SIZE, EWRAM_SIZE, IWRAM_SIZE, IO_SIZE, PAL_SIZE, VRAM_SIZE, OAM_SIZE, ROM_MAX,
     BIOS_WORDS, BIOS_LATCH_STARTUP,
@@ -41,7 +42,22 @@ def pad_rom(rom: bytes) -> bytearray:
     return out
 
 
-class Bus:
+_VIEWS = (("bios", "bios16", "bios32"), ("ewram", "ew16", "ew32"), ("iwram", "iw16", "iw32"),
+          ("io", "io16", None), ("pal", "pal16", "pal32"), ("vram", "vram16", "vram32"),
+          ("oam", "oam16", "oam32"), ("rom", "rom16", "rom32"))
+
+
+class Bus(Snapshottable):
+    # memoryviews can't be pickled (see src/core/adaptors/snapshot)
+    _NOT_STATE = tuple(v for _, v16, v32 in _VIEWS for v in (v16, v32) if v)
+
+    def _rebuild_transient(self) -> None:
+        for buf, v16, v32 in _VIEWS:
+            h, w = _view(getattr(self, buf))
+            setattr(self, v16, h)
+            if v32:
+                setattr(self, v32, w)
+
     def __init__(self, rom: bytes, bios: bytes | None = None, save=None, rtc=None):
         self.bios = bytearray(bios) if bios is not None else hle_bios_image()
         self.bios16, self.bios32 = _view(self.bios)

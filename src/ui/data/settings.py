@@ -73,6 +73,8 @@ HOTKEYS: dict[str, tuple[str, str]] = {
     "quick_save": ("Quick save", "F1"),
     "quick_load": ("Quick load", "F4"),
     "screenshot": ("Screenshot", "F12"),
+    "record": ("Start / stop recording", "F10"),
+    "clip": ("Clip the last 30 s", "F9"),
     "next_slot": ("Next save slot", "]"),
     "prev_slot": ("Previous save slot", "["),
     "fullscreen": ("Toggle fullscreen", "F11"),
@@ -179,7 +181,7 @@ class Settings:
 
     def apply_save_dir(self) -> Path | None:
         """Make sure the save folder exists and point every core at it."""
-        from src.core.saves import set_save_dir
+        from src.core.adaptors.saves import set_save_dir
         return set_save_dir(self.save_folder())
 
     def keyboard_for(self, system: str) -> dict[str, list[str]]:
