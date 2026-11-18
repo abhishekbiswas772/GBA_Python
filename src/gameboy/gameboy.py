@@ -1,5 +1,6 @@
 from src.gameboy.cartridge import Cartridge
 from src.gameboy.cpu import CPU
+from src.gameboy.joypad import Joypad
 from src.gameboy.mmu import MMU
 from src.gameboy.ppu import PPU
 from src.gameboy.timer import Timer
@@ -11,6 +12,8 @@ class GameBoy:
         self.mmu = MMU(self.cart)
         self.timer = Timer(self.mmu)
         self.mmu.timer = self.timer
+        self.joypad = Joypad(self.mmu)
+        self.mmu.joypad = self.joypad
         self.ppu = PPU(self.mmu)
         self.mmu.ppu = self.ppu
         self.cpu = CPU(self.mmu)

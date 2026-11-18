@@ -23,11 +23,13 @@ def make_rom(program: bytes = b"", org: int = 0x150,
 def build(rom: bytes):
     from src.gameboy.cartridge import Cartridge
     from src.gameboy.cpu import CPU
+    from src.gameboy.joypad import Joypad
     from src.gameboy.mmu import MMU
     from src.gameboy.timer import Timer
     mmu = MMU(Cartridge(rom))
     timer = Timer(mmu)
     mmu.timer = timer
+    mmu.joypad = Joypad(mmu)
     cpu = CPU(mmu)
     cpu.pc = 0x150
     return cpu, mmu, timer

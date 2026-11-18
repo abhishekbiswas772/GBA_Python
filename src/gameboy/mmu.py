@@ -12,6 +12,7 @@ class MMU:
         self.ie = 0x00
         self.timer = None
         self.ppu = None
+        self.joypad = None
 
         self.serial_output = []
 
@@ -81,6 +82,8 @@ class MMU:
         self.io[0x0F] |= bit
 
     def read_io(self, addr: int) -> int:
+        if addr == 0xFF00 and self.joypad is not None:
+            return self.joypad.read()
         if 0xFF04 <= addr <= 0xFF07 and self.timer is not None:
             return self.timer.read(addr)
         if 0xFF40 <= addr <= 0xFF4B and self.ppu is not None:
@@ -88,6 +91,9 @@ class MMU:
         return self.io[addr - 0xFF00]
 
     def write_io(self, addr: int, value: int) -> None:
+        if addr == 0xFF00 and self.joypad is not None:
+            self.joypad.write(value)
+            return
         if 0xFF04 <= addr <= 0xFF07 and self.timer is not None:
             self.timer.write(addr, value)
             return

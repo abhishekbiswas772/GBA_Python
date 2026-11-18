@@ -1,7 +1,5 @@
 import time
-
 import pygame
-
 from src.gameboy.ppu import WIDTH, HEIGHT
 
 DMG_PALETTE = ((0xE0, 0xF8, 0xD0), (0x88, 0xC0, 0x70), (0x34, 0x68, 0x56), (0x08, 0x18, 0x20))
@@ -30,6 +28,32 @@ def framebuffer_rgb(fb, tables=None, palette=DMG_PALETTE) -> bytes:
 
 def framebuffer_surface(fb, tables=None, palette=DMG_PALETTE):
     return pygame.image.frombytes(framebuffer_rgb(fb, tables, palette), (WIDTH, HEIGHT), "RGB")
+
+
+KEYMAP = {
+    pygame.K_RIGHT: "right",
+    pygame.K_LEFT: "left",
+    pygame.K_UP: "up",
+    pygame.K_DOWN: "down",
+    pygame.K_x: "a",
+    pygame.K_z: "b",
+    pygame.K_RETURN: "start",
+    pygame.K_RSHIFT: "select",
+    pygame.K_BACKSPACE: "select",
+}
+
+
+def joypad_key_handler(joypad):
+    def on_key(event):
+        button = KEYMAP.get(event.key)
+        if button is None:
+            return
+        if event.type == pygame.KEYDOWN:
+            if not getattr(event, "repeat", False):
+                joypad.press(button)
+        else:
+            joypad.release(button)
+    return on_key
 
 
 class Display:

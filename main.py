@@ -4,7 +4,13 @@ import time
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="keyboard mapping (window mode):\n"
+               "  Arrow keys   D-pad (Right/Left/Up/Down)\n"
+               "  X / Z        A / B\n"
+               "  Enter        Start\n"
+               "  Right Shift  Select (Backspace also works)")
     ap.add_argument("rom")
     ap.add_argument("--doctor", help="Write Gameboy Doctor log to this file")
     ap.add_argument("--steps", default=None, type=int, help="max instruction to run")
@@ -18,9 +24,10 @@ def main() -> None:
 
     window = not (args.headless or args.doctor or args.steps)
     if window:
-        from src.gameboy.display import Display
+        from src.gameboy.display import Display, joypad_key_handler
         title = args.rom.replace("\\", "/").rsplit("/", 1)[-1]
         disp = Display(gb, scale=args.scale, title=title)
+        disp.on_key = joypad_key_handler(gb.joypad)
         try:
             disp.run()
         except KeyboardInterrupt:
