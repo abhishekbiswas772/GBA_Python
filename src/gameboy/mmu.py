@@ -1,11 +1,5 @@
 from src.gameboy.cartridge import Cartridge
-
-# DMG IO read-back: bits OR'd in on read. 0xFF = unmapped (always reads 0xFF).
-# Registers owned by joypad/timer/APU/PPU apply their own masks.
-_IO_OR = bytearray([0xFF] * 0x80)
-_IO_OR[0x01] = 0x00      # SB
-_IO_OR[0x02] = 0x7E      # SC: only bits 7 and 0 exist
-_IO_OR[0x0F] = 0xE0      # IF: upper 3 bits read as 1
+from src.gameboy.common import IO_READ_OR as _IO_OR
 
 HDMA_BLOCK_CYCLES = 32   # real-time T-cycles the CPU is stalled per 16-byte HDMA block
 

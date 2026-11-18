@@ -1,10 +1,9 @@
-WIDTH = 160
-HEIGHT = 144
-LINE_DOTS = 456
-FRAME_DOTS = LINE_DOTS * 154
+from src.gameboy.common import (
+    WIDTH, HEIGHT, LINE_DOTS, FRAME_DOTS,
+    PIXEL_SHIFTS as _SHIFTS, REV, BLANK,
+)
 
-_PAIRS: list = [None] * 65536
-_SHIFTS = (7, 6, 5, 4, 3, 2, 1, 0)
+_PAIRS: list = [None] * 65536      # lazily-filled tile-row decode cache
 
 
 def _pair(lo: int, hi: int) -> bytes:
@@ -14,14 +13,6 @@ def _pair(lo: int, hi: int) -> bytes:
         p = bytes((((hi >> s) & 1) << 1) | ((lo >> s) & 1) for s in _SHIFTS)
         _PAIRS[key] = p
     return p
-
-
-def _bit_reverse(b: int) -> int:
-    return int(format(b, "08b")[::-1], 2)
-
-
-REV = bytes(_bit_reverse(b) for b in range(256))
-BLANK = bytes(WIDTH)
 
 
 def _palette_table(pal: int) -> bytes:

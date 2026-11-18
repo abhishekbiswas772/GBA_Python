@@ -1,8 +1,7 @@
-_NAMES = {"right": 0, "left": 1, "up": 2, "down": 3,
-          "a": 4, "b": 5, "select": 6, "start": 7}
-
-RIGHT, LEFT, UP, DOWN = 0, 1, 2, 3
-A, B, SELECT, START = 4, 5, 6, 7
+from src.gameboy.common import (
+    RIGHT, LEFT, UP, DOWN, A, B, SELECT, START,
+    BUTTON_NAMES as _NAMES,
+)
 
 
 def _index(button: str | int) -> int:
@@ -17,15 +16,6 @@ def _index(button: str | int) -> int:
 
 
 class Joypad:
-    """Register 0xFF00 (P1), active-low.
-
-    Bit 5 selects the button keys (A/B/Select/Start) and bit 4 the
-    direction keys (Right/Left/Up/Down); a clear select bit selects its
-    group. Bits 7-6 read as 1. Pressing a key in a selected group (or
-    selecting a group with a key held) drops a line 1->0 and requests the
-    joypad interrupt (IF bit 4).
-    """
-
     def __init__(self, mmu):
         self.mmu = mmu
         self.select = 0x30
