@@ -31,9 +31,10 @@ class Theme:
     rec: str         # recording red
     gold: str        # achievements
     shell: str       # handheld frame around exported video
+    nes: str = "#FF7A6B"
 
     def system(self, system: str) -> str:
-        return {"GB": self.gb, "GBC": self.gbc, "GBA": self.gba}.get(system, self.accent)
+        return {"GB": self.gb, "GBC": self.gbc, "GBA": self.gba, "NES": self.nes}.get(system, self.accent)
 
 
 THEMES: dict[str, Theme] = {
@@ -49,7 +50,7 @@ THEMES: dict[str, Theme] = {
         bg="#F4F5F8", panel="#FFFFFF", card="#FFFFFF", card2="#ECEEF3", line="#E2E5EB",
         line2="#D3D8E0", text="#14171F", sub="#363C49", muted="#5A6271", accent="#3D55D6",
         on="#FFFFFF", soft="#E8ECFF", screen="#0B0D10", gb="#3F7D1F", gbc="#B3561A",
-        gba="#3D55D6", rec="#C93434", gold="#C08A12", shell="#C9CCE8",
+        gba="#3D55D6", rec="#C93434", gold="#C08A12", shell="#C9CCE8", nes="#C8372D",
     ),
     "dmg": Theme(
         "dmg", "DMG Green", "The 1989 pea-soup look",
@@ -70,10 +71,10 @@ THEMES: dict[str, Theme] = {
 THEME_ORDER = ["midnight", "daylight", "dmg", "berry"]
 
 # Theme picked by "Match theme to console".
-CONSOLE_THEME = {"GB": "dmg", "GBC": "berry", "GBA": "midnight"}
+CONSOLE_THEME = {"GB": "dmg", "GBC": "berry", "GBA": "midnight", "NES": "midnight"}
 
-SYSTEM_NAMES = {"GB": "Game Boy", "GBC": "Game Boy Color", "GBA": "Game Boy Advance"}
-SYSTEM_RES = {"GB": "160×144 · DMG", "GBC": "160×144 · Color", "GBA": "240×160"}
+SYSTEM_NAMES = {"GB": "Game Boy", "GBC": "Game Boy Color", "GBA": "Game Boy Advance", "NES": "NES"}
+SYSTEM_RES = {"GB": "160×144 · DMG", "GBC": "160×144 · Color", "GBA": "240×160", "NES": "256×240 · NTSC"}
 
 
 @dataclass(frozen=True)

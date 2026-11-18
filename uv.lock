@@ -336,22 +336,22 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "flet", extra = ["all"] },
-    { name = "pygame" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "pygame" },
     { name = "pytest" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "flet", extras = ["all"] },
-    { name = "pygame", specifier = ">=2.6.1" },
-]
+requires-dist = [{ name = "flet", extras = ["all"] }]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest" }]
+dev = [
+    { name = "pygame", specifier = ">=2.6.1" },
+    { name = "pytest" },
+]
 
 [[package]]
 name = "h11"

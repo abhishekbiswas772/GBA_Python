@@ -1,2 +1,2 @@
-pygame
+pygame>=2.6.1; sys_platform != "android"
 flet[all]

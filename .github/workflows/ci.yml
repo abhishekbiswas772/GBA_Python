@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYGAME_HIDE_SUPPORT_PROMPT: "1"
+  PYTHONUTF8: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  checks:
+    name: Checks (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Byte-compile
+        run: uv run python -m compileall -q -f main.py src tests
+
+      - name: Lint
+        run: uvx ruff@0.17.5 check --select E9,F63,F7,F82 main.py src tests
+
+  test:
+    name: Unit tests (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+          - os: windows-latest
+            name: Windows
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${RUNNER_OS}" = "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends xvfb pulseaudio
+            pulseaudio --check || pulseaudio --start --exit-idle-time=-1
+            export SDL_VIDEODRIVER=x11
+            export SDL_AUDIODRIVER=pulse
+            exec xvfb-run -a -s "-screen 0 1280x720x24" uv run python -m pytest -q -m "not slow"
+          fi
+          uv run python -m pytest -q -m "not slow"
+
+  roms:
+    name: Test ROMs (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Blargg, Acid2 and other ROM tests
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb pulseaudio
+          pulseaudio --check || pulseaudio --start --exit-idle-time=-1
+          export SDL_VIDEODRIVER=x11
+          export SDL_AUDIODRIVER=pulse
+          xvfb-run -a -s "-screen 0 1280x720x24" uv run python -m pytest -q --slow -m slow

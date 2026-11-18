@@ -9,6 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
+# Local SDL / machine settings
+.env
+.env.*
+
 # Commercial ROMs (never commit)
 src/rom/
 
@@ -23,6 +27,7 @@ tests/roms/other/window-screenshot.png
 
 # Tool caches / profiling dumps
 .pytest_cache/
+.ruff_cache/
 prof
 *.prof
 rom/

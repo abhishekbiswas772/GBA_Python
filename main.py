@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 ROM_DIR = ROOT / "rom"
-ROM_SUBDIRS = ("gb", "gb_color", "gba")
+ROM_SUBDIRS = ("gb", "gb_color", "gba", "nes")
 COMMANDS = ("app", "play", "run", "info")
 
 KEYS_HELP = (
@@ -45,12 +45,12 @@ class _CoreSink:
 
 
 def ensure_rom_dir() -> Path:
-    """The ./rom library folder (created with gb / gb_color / gba subfolders if missing)."""
+    """The ./rom library folder (created with gb / gb_color / gba / nes subfolders if missing)."""
     created = not ROM_DIR.is_dir()
     for sub in ROM_SUBDIRS:
         (ROM_DIR / sub).mkdir(parents=True, exist_ok=True)
     if created:
-        print(f"[created ROM folder {ROM_DIR} - put your .gb / .gbc / .gba files in it]")
+        print(f"[created ROM folder {ROM_DIR} - put your .gb / .gbc / .gba / .nes files in it]")
     return ROM_DIR
 
 
@@ -105,6 +105,8 @@ def cmd_info(args) -> None:
     system = _system(rom)
     if system == "GBA":
         from src.core.gba.cartridge import Cartridge
+    elif system == "NES":
+        from src.core.nes.cartridge import Cartridge
     else:
         from src.core.gameboy.cartridge import Cartridge
     cart = Cartridge.from_file(rom)
@@ -177,13 +179,44 @@ def _play_gba(args, headless: bool) -> None:
           + _speed(gba.cpu.now, CPU_HZ, secs, "GBA"))
 
 
+def _play_nes(args, headless: bool) -> None:
+    from src.core.nes.common import CPU_HZ
+    from src.core.nes.nes import NES
+    nes = NES(args.rom)
+    print(nes.cart)
+    t0 = time.time()
+    try:
+        if not headless:
+            from src.core.nes.display import Display
+            disp = Display(nes, scale=args.scale, title=Path(args.rom).name, mute=args.mute)
+            _input(disp, nes, args.keys)
+            try:
+                disp.run()
+            except KeyboardInterrupt:
+                print("\n[Stopped by user]")
+        else:
+            try:
+                nes.run_frames(args.frames if args.frames is not None else 600)
+            except KeyboardInterrupt:
+                print("\n[Stopped by user]")
+    finally:
+        if nes.save():
+            print(f"[saved battery RAM -> {nes.cart.sav_path.name}]")
+    secs = time.time() - t0
+    print(f"{nes.ppu.frame:,} frames, {nes.cpu.cyc:,} cycles in {secs:.1f}s "
+          + _speed(nes.cpu.cyc, CPU_HZ, secs, "NES"))
+
+
 def cmd_play(args, headless: bool | None = None) -> None:
     args.rom = _check_rom(args.rom)
     if headless is None:
         headless = bool(args.headless or args.frames is not None or args.doctor
                         or args.steps is not None)
-    if _system(args.rom) == "GBA":
+    system = _system(args.rom)
+    if system == "GBA":
         _play_gba(args, headless)
+    elif system == "NES":
+        _play_nes(args, headless)
     else:
         _play_gb(args, headless)
 

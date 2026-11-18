@@ -137,6 +137,7 @@ class PPU:
         self.in_hblank = False
         self.next_event = HBLANK_START
         self.frame = 0
+        self.skip_render = False        # frameskip: run the timing, don't draw lines
         self.fb = bytearray(WIDTH * HEIGHT * 2)
         self.ref_x = [0, 0]             # internal affine reference points (BG2, BG3)
         self.ref_y = [0, 0]
@@ -190,7 +191,10 @@ class PPU:
         if not self.in_hblank:
             y = self.vcount
             if y < HEIGHT:
-                self.render_line(y)
+                if self.skip_render:
+                    self._advance_ref()          # keep affine BG state as if drawn
+                else:
+                    self.render_line(y)
             self.in_hblank = True
             self.stat |= STAT_HBLANK
             if self.stat & STAT_HBLANK_IRQ:

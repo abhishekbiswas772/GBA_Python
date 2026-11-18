@@ -10,12 +10,13 @@ from __future__ import annotations
 from src.bridge.adaptors.router import InputRouter
 from src.bridge.base import normalize_button
 
-# default layout of the desktop app (matches src.ui.data.settings.DEFAULT_KEYBOARD)
+# default GBA layout of the desktop app (matches src.ui.data.settings.DEFAULT_KEYBOARD_GBA;
+# the Game Boy layouts are the same without L / R)
 PRESET_APP: dict[str, list[str]] = {
-    "Up": ["W", "Arrow Up"], "Down": ["S", "Arrow Down"],
-    "Left": ["A", "Arrow Left"], "Right": ["D", "Arrow Right"],
-    "A": ["K"], "B": ["J"], "L": ["Q"], "R": ["E"],
-    "Start": ["Enter"], "Select": ["Backspace"],
+    "Up": ["Arrow Up", "W"], "Down": ["Arrow Down", "S"],
+    "Left": ["Arrow Left", "A"], "Right": ["Arrow Right", "D"],
+    "A": ["K", "X"], "B": ["J", "Z"], "L": ["Q", "U"], "R": ["E", "I"],
+    "Start": ["Enter"], "Select": ["Backspace", "Shift Right"],
 }
 # layout of the CLI pygame window (also listed in `python main.py --help`)
 PRESET_CLASSIC: dict[str, list[str]] = {

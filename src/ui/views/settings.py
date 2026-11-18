@@ -8,7 +8,8 @@ import flet as ft
 
 from src.ui import components as c
 from src.ui.data import samples
-from src.ui.data.settings import CONSOLE_BUTTONS, GAMEPAD_LAYOUT, GBA_ONLY, HOTKEYS, Settings, data_dir
+from src.ui.data.settings import (CONSOLE_BUTTONS, GAMEPAD_LAYOUT, GBA_ONLY, HOTKEYS, SYSTEMS, Settings,
+                                  buttons_for, data_dir)
 from src.ui.views.player import norm_key
 
 if TYPE_CHECKING:
@@ -28,8 +29,9 @@ def _stored(key: str) -> str:
 
 def build(app: "App") -> ft.Control:
     t, ui, wide = app.t, app.ui, app.wide
-    if ui.draft_keyboard is None:
-        ui.draft_keyboard = {k: list(v) for k, v in app.settings.keyboard.items()}
+    if ui.draft_keyboards is None:
+        ui.draft_keyboards = {sysname: {b: list(k) for b, k in m.items()}
+                              for sysname, m in app.settings.keyboards.items()}
         ui.draft_hotkeys = dict(app.settings.hotkeys)
 
     def pick_section(name: str) -> None:
@@ -86,20 +88,10 @@ def build(app: "App") -> ft.Control:
             app.render()
             return
         key = _stored(e.key)
+        if not key:
+            return
         kind, ident, col = ui.listening
-        if kind == "button":
-            row = ui.draft_keyboard[ident]
-            # A key drives one console button: clear it from anywhere else first.
-            for other in ui.draft_keyboard.values():
-                for i, k in enumerate(other):
-                    if k == key:
-                        other[i] = ""
-            row[col] = key
-        else:
-            for hid, k in ui.draft_hotkeys.items():
-                if k == key:
-                    ui.draft_hotkeys[hid] = ""
-            ui.draft_hotkeys[ident] = key
+        assign_key(ui.draft_keyboards, ui.draft_hotkeys, kind, ident, col, key, ui.settings_system)
         ui.listening = None
         app.render()
 
@@ -107,6 +99,36 @@ def build(app: "App") -> ft.Control:
 
 
 # -------------------------------------------------------------------- controls
+def assign_key(keyboards: dict, hotkeys: dict, kind: str, ident: str, col: int, key: str, system: str) -> None:
+    """Bind `key` and clear every conflicting binding, so one key does one thing:
+
+    * a console button on `system`: the key leaves the other buttons of that
+      system's layout and any hotkey (hotkeys are active in every game),
+    * a hotkey: the key leaves the other hotkeys and every system's layout.
+    """
+    same = norm_key(key)
+    if kind == "button":
+        layout = keyboards[system]
+        for keys in layout.values():
+            for i, k in enumerate(keys):
+                if k and norm_key(k) == same:
+                    keys[i] = ""
+        for hid, k in hotkeys.items():
+            if k and norm_key(k) == same:
+                hotkeys[hid] = ""
+        layout[ident][col] = key
+    else:
+        for hid, k in hotkeys.items():
+            if k and norm_key(k) == same:
+                hotkeys[hid] = ""
+        for layout in keyboards.values():
+            for keys in layout.values():
+                for i, k in enumerate(keys):
+                    if k and norm_key(k) == same:
+                        keys[i] = ""
+        hotkeys[ident] = key
+
+
 def _controls(app: "App") -> list[ft.Control]:
     t, ui = app.t, app.ui
     kb = ui.settings_device == "kb"
@@ -116,7 +138,8 @@ def _controls(app: "App") -> list[ft.Control]:
         app.render()
 
     def save(e) -> None:
-        app.settings.keyboard = {k: list(v) for k, v in ui.draft_keyboard.items()}
+        app.settings.keyboards = {sysname: {b: list(k) for b, k in m.items()}
+                                  for sysname, m in ui.draft_keyboards.items()}
         app.settings.hotkeys = dict(ui.draft_hotkeys)
         app.settings.save()
         app.toast("Controls saved")
@@ -124,7 +147,7 @@ def _controls(app: "App") -> list[ft.Control]:
 
     def reset(e) -> None:
         d = Settings()
-        ui.draft_keyboard = d.keyboard
+        ui.draft_keyboards = d.keyboards
         ui.draft_hotkeys = d.hotkeys
         ui.listening = None
         app.render()
@@ -146,6 +169,16 @@ def _controls(app: "App") -> list[ft.Control]:
     devices = c.segmented([("kb", "Keyboard"), ("pad", "Gamepad")], ui.settings_device,
                           lambda v: (setattr(ui, "settings_device", v), setattr(ui, "listening", None), app.render()),
                           t, bg=t.panel, item_pad=16)
+    system = ui.settings_system if ui.settings_system in SYSTEMS else "GBA"
+    if kb:
+        names = {"GB": "Game Boy", "GBC": "Game Boy Color", "GBA": "Game Boy Advance", "NES": "NES"}
+        systems = c.segmented([(s, names[s]) for s in SYSTEMS], system,
+                              lambda v: (setattr(ui, "settings_system", v), setattr(ui, "listening", None),
+                                         app.render()), t, bg=t.panel, item_pad=14)
+        devices = ft.Column([devices, ft.Row([c.text("Layout for", size=13, color=t.muted), systems],
+                                             spacing=12, wrap=True,
+                                             vertical_alignment=ft.CrossAxisAlignment.CENTER)],
+                            spacing=14, tight=True)
 
     def chip(label: str, target, primary: bool) -> ft.Control:
         on = ui.listening == target
@@ -168,18 +201,19 @@ def _controls(app: "App") -> list[ft.Control]:
     ]), padding=c.pad(20, 12), border=ft.Border.only(bottom=ft.BorderSide(1, t.line)))
     rows: list[ft.Control] = [header_row]
     divider = "#1E222B" if t.key == "midnight" else t.line
-    for i, btn in enumerate(CONSOLE_BUTTONS):
-        keys = ui.draft_keyboard[btn] if kb else GAMEPAD_LAYOUT[btn]
+    shown = buttons_for(system) if kb else CONSOLE_BUTTONS
+    for i, btn in enumerate(shown):
+        keys = ui.draft_keyboards[system][btn] if kb else GAMEPAD_LAYOUT[btn]
         name = ft.Row([c.text(btn, color=t.text)] + (
             [c.pill("GBA", "#232A45" if t.key != "daylight" else t.soft,
                     "#B7C3FF" if t.key != "daylight" else t.accent, size=10, radius=4, padding=c.pad(6, 2))]
-            if btn in GBA_ONLY else []), spacing=10)
+            if btn in GBA_ONLY and not kb else []), spacing=10)
         rows.append(ft.Container(ft.Row([
             cell(name, 14),
             cell(chip(keys[0], ("button", btn, 0), True), 10),
             cell(chip(keys[1], ("button", btn, 1), False), 10),
         ], vertical_alignment=ft.CrossAxisAlignment.CENTER), padding=c.pad(20, 6),
-            border=ft.Border.only(bottom=ft.BorderSide(1, divider)) if i < len(CONSOLE_BUTTONS) - 1 else None))
+            border=ft.Border.only(bottom=ft.BorderSide(1, divider)) if i < len(shown) - 1 else None))
     table = ft.Container(ft.Column(rows, spacing=0), bgcolor=t.card, border=c.border(t.line), border_radius=14)
     if not app.wide:
         table = ft.Row([ft.Container(table, width=560)], scroll=ft.ScrollMode.AUTO)

@@ -1,63 +1,34 @@
-"""One running game: owns the emulator Machine (via src.bridge), the frame
-loop, input and audio.
+"""One running game, as seen by the UI.
 
-The frame loop is an asyncio task on the Flet page; each batch of frames is
-emulated in a worker thread so the UI stays responsive.
+All emulation happens in an :class:`~src.bridge.runner.EmulatorRunner`
+worker thread. It owns the Machine and the SDL audio, paces itself on the
+sound card and frameskips when it falls behind. This class is the async
+side: one asyncio task on the Flet page polls for the newest finished frame,
+wakes when the worker signals a new frame (no busy polling), encodes it and
+pushes it to the screen, polls gamepads, and routes input to
+the worker. The UI thread never runs the emulator, so keys, clicks and
+redraws stay responsive whatever the game is doing.
 """
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import time
-from array import array
 from pathlib import Path
 
 import flet as ft
 
 from src import bridge
 from src.bridge.adaptors import GamepadAdaptor, InputRouter
+from src.bridge.runner import EmulatorRunner, Stats
 from src.ui.data.library import Game
 from src.ui.data.moments import new_path
 from src.ui.data.settings import Settings, data_dir
 from src.ui.emulator import frame as fr
 from src.ui.theme import GB_PALETTES
 
-
-def _make_audio(apu):
-    """SDL audio via the core's AudioOut (desktop only: needs pygame/SDL2)."""
-    try:
-        from src.core.gameboy.display import AudioOut
-    except Exception:
-        return None
-
-    class ScaledAudio(AudioOut):
-        volume = 1.0
-
-        def pump(self) -> None:
-            data = self.apu.take_samples()
-            if len(data) < 2:
-                return
-            q = self.queued()
-            if self.started and q == 0:
-                self.underruns += 1
-            if q > self.max_bytes:
-                self.dropped += 1
-                return
-            if self.volume < 0.999:
-                v = self.volume
-                data = array("h", [int(s * v) for s in data])
-            raw = data.tobytes()
-            self.sdl.SDL_QueueAudio(self.dev, raw, len(raw))
-            self.played += 1
-            if not self.started and q + len(raw) >= self.target:
-                self.sdl.SDL_PauseAudioDevice(self.dev, 0)
-                self.started = True
-
-    try:
-        return ScaledAudio(apu)
-    except Exception as e:          # no audio device, no SDL, ...
-        print(f"[ui] audio disabled: {e}")
-        return None
+PAD_POLL = 1 / 60         # longest wait between display-loop ticks (gamepad polling)
+STATS_EVERY = 0.5         # seconds between footer refreshes
 
 
 def thumb_path(rom_path: str) -> Path:
@@ -66,19 +37,17 @@ def thumb_path(rom_path: str) -> Path:
     return d / (hashlib.sha1(rom_path.encode()).hexdigest()[:16] + ".png")
 
 
-class _MachineSink:
-    """Router sink: forwards to whichever machine the session currently runs."""
+class _RunnerSink:
+    """Router sink: every press / release goes to the worker's input queue."""
 
     def __init__(self, session: "EmulatorSession"):
         self.session = session
 
     def press(self, button: str) -> None:
-        if self.session.machine:
-            self.session.machine.press(button)
+        self.session.runner.press(button)
 
     def release(self, button: str) -> None:
-        if self.session.machine:
-            self.session.machine.release(button)
+        self.session.runner.release(button)
 
 
 _GAMEPADS: GamepadAdaptor | None = None        # one SDL controller handle per process
@@ -89,27 +58,30 @@ class EmulatorSession:
         self.page = page
         self.game = game
         self.settings = settings
-        self.machine: bridge.Machine | None = None
-        self.audio = None
         self.error: str | None = None
-        self.paused = False
-        self.speed = 1
-        self.fast_forward = False      # hotkey held
-        self.fps = 0.0
         self.slot = 1
-        self.on_status = None          # callable() when fps/paused changes
+        self.stats = Stats()
+        self.on_status = None          # callable() when stats / error change
+        self.keys = None               # KeyboardAdaptor, created by the player view
         self._running = False
         self._rgb: bytes | None = None
         self._prev: bytes | None = None
         self._t_start = time.time()
-        self.input = InputRouter(_MachineSink(self))     # keyboard + touch + gamepads
+        web = page is not None and bool(getattr(page, "web", False))
+        self.runner = EmulatorRunner(lambda: bridge.load(game.path), audio=not web,
+                                     palette=self._palette(), name=f"emu:{game.filename}")
+        self.input = InputRouter(_RunnerSink(self))     # keyboard + touch + gamepads
         self.gamepads = self._gamepads()
+        self.apply_volume()
 
         self.image = ft.Image(
-            src=fr.blank_png(), fit=ft.BoxFit.CONTAIN, gapless_playback=True,
+            src=fr.blank_png(*self._native()), fit=ft.BoxFit.CONTAIN, gapless_playback=True,
             filter_quality=self._filter(), expand=True,
         )
-        self._boot()
+
+    def _native(self) -> tuple[int, int]:
+        from src.ui.data.library import NATIVE_SIZE
+        return NATIVE_SIZE.get(self.game.system, (160, 144))
 
     def _gamepads(self) -> GamepadAdaptor | None:
         """Shared gamepad adaptor re-targeted at this session (desktop only)."""
@@ -122,46 +94,52 @@ class EmulatorSession:
             _GAMEPADS.router = self.input
         return _GAMEPADS if _GAMEPADS.available else None
 
+    # ------------------------------------------------------------------ state
+    @property
+    def machine(self) -> bridge.Machine | None:
+        return self.runner.machine
+
+    @property
+    def paused(self) -> bool:
+        return self.runner.paused
+
+    @property
+    def speed(self) -> int:
+        return self.runner.speed
+
+    @speed.setter
+    def speed(self, n: int) -> None:
+        self.runner.set_speed(n)
+
+    @property
+    def fast_forward(self) -> bool:
+        return self.runner.fast_forward
+
+    @fast_forward.setter
+    def fast_forward(self, on: bool) -> None:
+        self.runner.set_fast_forward(on)
+
+    @property
+    def fps(self) -> float:
+        """Frames drawn per second (what you see)."""
+        return self.stats.drawn_fps
+
     # ------------------------------------------------------------------ lifecycle
-    def _boot(self) -> None:
-        try:
-            self.machine = bridge.load(self.game.path)
-        except Exception as e:
-            self.machine = None
-            self.error = f"Couldn't load this ROM: {e}"
-            return
-        self._attach_audio()
-
-    def _attach_audio(self) -> None:
-        if self.audio is None:
-            self.audio = _make_audio(self.machine.apu)
-        else:
-            self.audio.apu.sampling = False
-            self.audio.apu = self.machine.apu
-            self.machine.apu.sampling = True
-        self.apply_volume()
-
     def start(self) -> None:
         if self._running:
             return
         self._running = True
-        self.page.run_task(self._loop)
+        self.runner.start()
+        self.page.run_task(self._display_loop)
 
     def close(self) -> None:
         self._running = False
         self.input.release_all()
-        if self.machine:
+        self.runner.close()                    # worker saves battery RAM + closes audio
+        m = self.machine
+        if self._rgb and m:
             try:
-                self.machine.save()
-            except Exception as e:
-                print(f"[ui] save RAM failed: {e}")
-        if self.audio:
-            self.audio.close()
-            self.audio = None
-        if self._rgb and self.machine:
-            try:
-                thumb_path(self.game.path).write_bytes(
-                    fr.encode_png(self._rgb, self.machine.width, self.machine.height))
+                thumb_path(self.game.path).write_bytes(fr.encode_png(self._rgb, m.width, m.height))
             except OSError:
                 pass
         h = self.settings.history.setdefault(self.game.path, {})
@@ -170,9 +148,8 @@ class EmulatorSession:
         self.settings.save()
 
     def reset(self) -> None:
-        if self.machine:
-            self.machine.reset()               # saves battery RAM first
-            self._attach_audio()
+        self.input.release_all()
+        self.runner.reset()
         self._prev = None
 
     # ------------------------------------------------------------------ settings
@@ -181,15 +158,15 @@ class EmulatorSession:
 
     def apply_video(self) -> None:
         self.image.filter_quality = self._filter()
+        self.runner.set_palette(self._palette())
 
     def apply_volume(self) -> None:
-        if self.audio:
-            self.audio.volume = max(0.0, min(1.0, self.settings.volume / 100))
+        self.runner.set_volume(self.settings.volume / 100)
 
     # ------------------------------------------------------------------ input
     def press(self, button: str, source: str = "ui") -> None:
         try:
-            self.input.press(source, button)   # router -> bridge maps "A"/"L"/... to the core
+            self.input.press(source, button)
         except ValueError:
             pass                               # unknown button: ignore
 
@@ -200,83 +177,74 @@ class EmulatorSession:
             pass
 
     def toggle_pause(self) -> None:
-        self.paused = not self.paused
-        if self.paused:
+        paused = not self.paused
+        if paused:
             self.input.release_all()
-        if self.audio and self.paused:
-            self.audio.sdl.SDL_ClearQueuedAudio(self.audio.dev)
-            self.audio.started = False
-            self.audio.sdl.SDL_PauseAudioDevice(self.audio.dev, 1)
+        self.runner.set_paused(paused)
 
     # ------------------------------------------------------------------ frames
     def _palette(self) -> tuple:
         return GB_PALETTES.get(self.settings.gb_palette, GB_PALETTES["pea"]).rgb()
 
-    def _step(self, n: int) -> bytes:
-        m = self.machine
-        for _ in range(n):
-            m.run_frame()
-        if self.audio:
-            if n == 1 and self.settings.volume > 0:
-                self.audio.pump()
-            else:
-                m.apu.take_samples()           # drop audio while fast-forwarding
-        if m.system == "GB":
-            rgb = m.frame_rgb(self._palette())
-        else:
-            rgb = m.frame_rgb()
-            if m.system == "GBC" and self.settings.lcd_colors:
-                rgb = fr.lcd_correct(rgb)
+    def _present(self, frame) -> bytes:
+        """Post-process one RGB frame (LCD colours, ghosting) and encode it."""
+        rgb = frame.rgb
+        if self.game.system == "GBC" and self.settings.lcd_colors:
+            rgb = fr.lcd_correct(rgb)
         if self.settings.frame_blend:
             out = fr.blend(self._prev, rgb)
             self._prev = rgb
             rgb = out
         self._rgb = rgb
-        return fr.encode_png(rgb, m.width, m.height)
+        return fr.encode_png(rgb, frame.width, frame.height)
 
-    async def _loop(self) -> None:
-        period = 1 / (self.machine.fps if self.machine else 60.0)
-        next_t = time.perf_counter()
-        counted, t_count = 0, time.perf_counter()
-        while self._running:
-            if self.paused or self.machine is None:
-                await asyncio.sleep(0.05)
-                next_t = time.perf_counter()
-                continue
-            n = self.speed * (4 if self.fast_forward else 1)
-            if self.gamepads is not None:
-                self.gamepads.poll()
+    async def _display_loop(self) -> None:
+        r = self.runner
+        loop = asyncio.get_running_loop()
+        new_frame = asyncio.Event()
+
+        def wake(_frame) -> None:                   # worker thread -> this loop, thread-safe
             try:
-                png = await asyncio.to_thread(self._step, n)
-            except Exception as e:                  # emulator crash: stop and report
-                self.error = f"Emulation stopped: {e}"
-                self.paused = True
-                self._notify()
-                continue
+                loop.call_soon_threadsafe(new_frame.set)
+            except RuntimeError:
+                pass                                # loop already closed
+        r.on_frame = wake
+        await asyncio.to_thread(r.ready.wait, 30)
+        last_seq = 0
+        next_stats = time.perf_counter() + STATS_EVERY
+        while self._running:
+            # wait for the worker's next frame; the timeout keeps gamepads polled
+            # (and stats fresh) even while paused or frameskipping
+            try:
+                await asyncio.wait_for(new_frame.wait(), PAD_POLL)
+            except asyncio.TimeoutError:
+                pass
+            new_frame.clear()
             if not self._running:
                 break
-            self.image.src = png
-            try:
-                self.image.update()
-            except Exception:
-                pass                                # view not mounted (navigating away)
-            counted += n
-            now = time.perf_counter()
-            if now - t_count >= 1.0:
-                self.fps = counted / (now - t_count)
-                counted, t_count = 0, now
+            if self.gamepads is not None:
+                try:
+                    self.gamepads.poll()
+                except Exception:
+                    pass
+            f = r.latest
+            if f is not None and f.seq != last_seq:
+                last_seq = f.seq
+                self.image.src = self._present(f)
+                try:
+                    self.image.update()
+                except Exception:
+                    pass                            # view not mounted (navigating away)
+            if r.error and r.error != self.error:   # load failure or emulator crash
+                self.error = r.error
                 self._notify()
-            if self.audio and self.audio.started and n == 1:
-                await asyncio.to_thread(self.audio.wait)
-                next_t = time.perf_counter()
-            else:
-                next_t += period
-                delay = next_t - time.perf_counter()
-                if delay > 0:
-                    await asyncio.sleep(delay)
-                else:
-                    next_t = time.perf_counter()
-                    await asyncio.sleep(0)
+            now = time.perf_counter()
+            if now >= next_stats:
+                next_stats = now + STATS_EVERY
+                if r.stats != self.stats:
+                    self.stats = r.stats
+                    self._notify()
+        r.on_frame = None
 
     def _notify(self) -> None:
         if self.on_status:

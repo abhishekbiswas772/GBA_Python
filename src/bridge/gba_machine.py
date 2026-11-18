@@ -74,8 +74,13 @@ class GBAMachine(Machine):
         return f"{h.title} [{h.game_code}]"
 
     # ------------------------------------------------------------------ running
-    def run_frame(self) -> None:
-        self.core.run_frame()
+    def run_frame(self, render: bool = True) -> None:
+        ppu = self.core.ppu
+        ppu.skip_render = not render
+        try:
+            self.core.run_frame()
+        finally:
+            ppu.skip_render = False
 
     # ------------------------------------------------------------------ input
     def press(self, button: str) -> None:

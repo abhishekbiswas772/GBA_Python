@@ -70,7 +70,10 @@ class GamepadAdaptor:
         try:
             import pygame
             import pygame._sdl2.controller as controller
-            pygame.init()
+            # only what controllers need: pygame.init() would also open the
+            # mixer, grabbing the audio device the emulator's sound output wants
+            pygame.display.init()          # event pump (no window is created)
+            pygame.joystick.init()
             controller.init()
             self._pygame = pygame
             self._mod = controller

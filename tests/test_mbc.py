@@ -1,8 +1,4 @@
 """MBC mapper + battery save tests (fast, in-memory crafted headers)."""
-import os
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-
 import shutil
 import time
 from pathlib import Path

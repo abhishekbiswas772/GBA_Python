@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 _search_ref: ft.Ref[ft.TextField] = ft.Ref()
 
-FILTERS = [("all", "All games"), ("GB", "Game Boy"), ("GBC", "Game Boy Color"), ("GBA", "Game Boy Advance")]
+FILTERS = [("all", "All games"), ("GB", "Game Boy"), ("GBC", "Game Boy Color"), ("GBA", "Game Boy Advance"), ("NES", "NES")]
 HEADINGS = {**dict(FILTERS), "fav": "Favorites"}
 SORTS = [("recent", "Last played"), ("title", "Title A–Z"), ("system", "System")]
 
@@ -45,7 +45,7 @@ def build(app: "App") -> ft.Control:
             return
         files = await ft.FilePicker().pick_files(
             dialog_title="Add ROMs", allow_multiple=True, file_type=ft.FilePickerFileType.CUSTOM,
-            allowed_extensions=["gb", "gbc", "cgb", "gba", "agb"])
+            allowed_extensions=["gb", "gbc", "cgb", "gba", "agb", "nes"])
         paths = [f.path for f in files or [] if f.path]
         if not paths:
             return
@@ -69,7 +69,7 @@ def build(app: "App") -> ft.Control:
             return str(len(app.games))
         return str(sum(1 for g in app.games if g.system == f))
 
-    dot_color = {"all": t.text, "GB": t.gb, "GBC": t.gbc, "GBA": t.gba}
+    dot_color = {"all": t.text, "GB": t.gb, "GBC": t.gbc, "GBA": t.gba, "NES": t.nes}
     nav = [c.eyebrow("Library", t)] + [
         c.nav_item(t, label, (lambda e, k=key: set_filter(k)), lead=c.dot(dot_color[key], 8, 2),
                    trailing=c.mono(count(key), t), selected=ui.lib_filter == key)
@@ -171,6 +171,7 @@ def build(app: "App") -> ft.Control:
         favs = set(app.settings.favorites)
         shown = _visible_games(app)
         cell = c.cell_width(main_w, 168, 20)
+        COVERS.clear()
         cards = [_game_card(app, g, g.path in favs, toggle_fav, cell) for g in shown]
         if cards:
             return c.auto_grid(cards, main_w, 168, gap=20)
@@ -232,7 +233,7 @@ def _continue_card(app: "App", add_roms, main_w: float) -> ft.Control:
     g = recent[0] if recent else lib.sort_games(app.games, "title")[0]
     thumb = thumb_path(g.path)
     shot = thumb.read_bytes() if thumb.exists() else None
-    w, h = (240, 160) if g.system == "GBA" else (160, 144)
+    w, h = lib.NATIVE_SIZE.get(g.system, (160, 144))
     screen = c.screen_placeholder(t, f"Last frame · {w}×{h}" if recent else f"{w}×{h}",
                                   aspect=w / h, image=shot, width=300 if app.width >= 760 else min(main_w - 44, 480))
     meta = [lib.played(g.seconds) if g.seconds else "Not played yet", lib.ago(g.last_played), g.filename]
@@ -281,14 +282,56 @@ def _open_moment(app: "App", path: str) -> None:
     app.go("moments")
 
 
+# rom path -> the cover box of its card on screen, so a preview made in the
+# background can drop into place without re-rendering the whole library
+COVERS: dict[str, tuple[ft.Container, float]] = {}
+
+
+def _cover_image(g: lib.Game) -> bytes | None:
+    p = thumb_path(g.path)
+    try:
+        return p.read_bytes() if p.exists() else None
+    except OSError:
+        return None
+
+
+def _fill_cover(box: ft.Container, png: bytes, size: float) -> None:
+    box.content = ft.Image(src=png, fit=ft.BoxFit.CONTAIN, filter_quality=ft.FilterQuality.NONE,
+                           width=size, height=size, gapless_playback=True)
+    box.bgcolor = "#0B0D10"
+
+
+def show_preview(app: "App", path: str) -> None:
+    """A preview was just made for `path`: put it on its card if it's visible."""
+    slot = COVERS.get(path)
+    if slot is None or app.route != "library":
+        return
+    box, size = slot
+    g = app.game_by_path(path)
+    png = _cover_image(g) if g else None
+    if png is None:
+        return
+    _fill_cover(box, png, size)
+    try:
+        box.update()
+    except Exception:
+        pass                       # card no longer mounted
+
+
 def _game_card(app: "App", g: lib.Game, fav: bool, toggle_fav, size: float) -> ft.Control:
     t = app.t
+    box = ft.Container(
+        c.text(g.system, size=34, weight=700, kind="display", color=t.system(g.system), spacing=-0.68),
+        alignment=ft.Alignment.CENTER, bgcolor=t.card, border=c.border(t.line2), border_radius=12,
+        clip_behavior=ft.ClipBehavior.HARD_EDGE, left=0, right=0, top=0, bottom=0,
+    )
+    shot = _cover_image(g) if g.playable else None
+    if shot is not None:
+        _fill_cover(box, shot, size)
+    COVERS[g.path] = (box, size)
     cover = ft.Stack([
-        ft.Container(
-            c.text(g.system, size=34, weight=700, kind="display", color=t.system(g.system), spacing=-0.68),
-            alignment=ft.Alignment.CENTER, bgcolor=t.card, border=c.border(t.line2), border_radius=12,
-            left=0, right=0, top=0, bottom=0,
-        ),
+        box,
+        ft.Container(c.system_badge(g.system, t), left=8, top=8) if shot is not None else
         ft.Container(c.mono(SYSTEM_RES[g.system], t, size=10), left=10, bottom=10),
         ft.Container(
             ft.IconButton(ft.Icons.STAR if fav else ft.Icons.STAR_OUTLINE, icon_size=16,

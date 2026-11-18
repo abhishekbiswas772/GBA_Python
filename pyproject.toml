@@ -8,12 +8,41 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "pygame>=2.6.1",
     "flet[all]",
 ]
 
+# pygame has no Android wheel. Desktop builds opt in below; `uv sync` still
+# installs it through the dev group so tests and `python main.py` keep sound.
 [dependency-groups]
-dev = ["pytest"]
+dev = ["pytest", "pygame>=2.6.1"]
+
+[tool.flet]
+org = "com.abhishekbiswas"
+product = "GBA Python"
+artifact = "GBA Python"
+company = "Abhishek Biswas"
+copyright = "Copyright (C) 2026 Abhishek Biswas"
+bundle_id = "com.abhishekbiswas.gameboy_python"
+icon_background = "#0F1115"
+splash_color = "#0F1115"
+
+[tool.flet.app]
+module = "main.py"
+exclude = ["tests", "rom", "src/rom", "docs"]
+
+[tool.flet.windows]
+dependencies = ["pygame>=2.6.1"]
+
+[tool.flet.macos]
+dependencies = ["pygame>=2.6.1"]
+
+[tool.flet.linux]
+bundle_id = "com.abhishekbiswas.gameboy_python"
+dependencies = ["pygame>=2.6.1"]
+
+[tool.flet.android]
+target_arch = ["arm64-v8a", "armeabi-v7a", "x86_64"]
+split_per_abi = true
 
 [tool.uv]
 package = false          # an application: run with `python main.py`, nothing to build

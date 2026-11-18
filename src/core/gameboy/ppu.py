@@ -85,6 +85,7 @@ class PPU:
         self.framebuffer = bytearray(WIDTH * HEIGHT)
         self.frame_count = 0
         self.frame_ready = False
+        self.skip_render = False   # frameskip: keep timing / window state, don't draw
         self.vram_locked = False
         self.oam_locked = False
         self._stat_line = False
@@ -283,7 +284,19 @@ class PPU:
                 row[tx * 8:tx * 8 + 8] = _pair(vram[off], vram[off + 1])
         return row
 
+    def _skip_line(self) -> None:
+        """Frameskip: the window line counter advances exactly as _render_line would."""
+        lcdc = self.lcdc
+        if not (lcdc & 0x80) or not (self.cgb or lcdc & 0x01):
+            return
+        if lcdc & 0x20 and self.wx <= 166 and (self.win_active or self.ly >= self.wy):
+            self.win_active = True
+            self.win_y += 1
+
     def _render_line(self) -> None:
+        if self.skip_render:
+            self._skip_line()
+            return
         if self.cgb:
             self._render_line_cgb()
             return

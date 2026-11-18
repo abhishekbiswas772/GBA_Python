@@ -93,7 +93,7 @@ class AudioOut:
     RATE = SAMPLE_RATE
     BYTES_PER_FRAME = 4                       # S16 stereo
 
-    def __init__(self, apu, target: float = 0.05, max_latency: float = 0.25):
+    def __init__(self, apu, target: float = 0.095, max_latency: float = 0.25):
         import ctypes
         c = ctypes
 
@@ -130,6 +130,7 @@ class AudioOut:
             raise pygame.error(err)
         self.apu = apu
         self.target = int(target * self.RATE) * self.BYTES_PER_FRAME
+        self.low = int(0.060 * self.RATE) * self.BYTES_PER_FRAME    # below: behind real time
         self.max_bytes = int(max_latency * self.RATE) * self.BYTES_PER_FRAME
         self.started = False
         self.played = 0                       # frames of samples queued
@@ -194,6 +195,7 @@ class Display:
         self.on_key = None
         self.on_frame = None          # optional callable() before each frame (gamepad polling)
         self.frames = 0
+        self._skipped = 0
         self.audio = None
         if not mute:
             try:
@@ -215,15 +217,25 @@ class Display:
                     break
                 if self.on_frame:
                     self.on_frame()
-                self.gb.run_frame()
+                draw = self._skipped >= 3 or not (self.audio and self.audio.started
+                                                  and self.audio.queued() < self.audio.low)
+                self.gb.ppu.skip_render = not draw        # frameskip when behind real time
+                try:
+                    self.gb.run_frame()
+                finally:
+                    self.gb.ppu.skip_render = False
                 if self.audio:
                     self.audio.pump()
-                if self.gb.cgb:
-                    surf = cgb_surface(self.gb.ppu)
+                if draw:
+                    self._skipped = 0
+                    if self.gb.cgb:
+                        surf = cgb_surface(self.gb.ppu)
+                    else:
+                        surf = framebuffer_surface(self.gb.ppu.framebuffer, self.tables, self.palette)
+                    pygame.transform.scale(surf.convert(), self.screen.get_size(), self.screen)
+                    pygame.display.flip()
                 else:
-                    surf = framebuffer_surface(self.gb.ppu.framebuffer, self.tables, self.palette)
-                pygame.transform.scale(surf.convert(), self.screen.get_size(), self.screen)
-                pygame.display.flip()
+                    self._skipped += 1
                 self.frames += 1
                 if self.frames % 30 == 0:
                     wall = time.perf_counter() - t0

@@ -50,7 +50,7 @@ class Machine:
     contract.
     """
 
-    #: "GB", "GBC" or "GBA"
+    #: "GB", "GBC", "GBA" or "NES"
     system: str = "?"
     #: native screen width in pixels
     width: int = 0
@@ -60,14 +60,18 @@ class Machine:
     fps: float = 60.0
 
     # ------------------------------------------------------------------ running
-    def run_frame(self) -> None:
-        """Emulate exactly one video frame."""
+    def run_frame(self, render: bool = True) -> None:
+        """Emulate exactly one video frame.
+
+        ``render=False`` is frameskip: the game runs exactly the same (timing,
+        interrupts, audio), only the framebuffer is not drawn, so
+        ``frame_rgb()`` keeps showing the last drawn frame."""
         raise NotImplementedError
 
-    def run_frames(self, n: int) -> None:
-        """Emulate ``n`` video frames."""
-        for _ in range(n):
-            self.run_frame()
+    def run_frames(self, n: int, render_last: bool = True) -> None:
+        """Emulate ``n`` video frames (only the last one drawn when ``render_last``)."""
+        for i in range(n):
+            self.run_frame(render=render_last and i == n - 1)
 
     # ------------------------------------------------------------------ input
     def press(self, button: str) -> None:

@@ -1,8 +1,4 @@
 """Slow smoke: capture Pokemon Red title-screen audio to a WAV (no mixer used)."""
-import os
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-
 import shutil
 import wave
 from array import array

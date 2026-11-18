@@ -1,497 +1,307 @@
-# Game Boy / Game Boy Color / Game Boy Advance Emulator
+<p align="center">
+  <img src="assets/icon.png" width="96" alt="GBA Python icon" />
+</p>
 
-A multi-platform retro gaming emulator written in Python, supporting **Game Boy (GB), Game Boy Color (GBC), and Game Boy Advance (GBA)**.
+<h1 align="center">GBA Python</h1>
 
-The project includes a Python-based emulation core and a cross-platform graphical interface built with [Flet](https://flet.dev/). It supports CPU emulation, graphics, audio, memory banking, interrupts, cartridge controllers, battery-backed saves, and more.
+<p align="center">
+  <b>Game Boy · Game Boy Color · Game Boy Advance · NES</b><br/>
+  Four consoles emulated from scratch in pure Python, with a modern Flet desktop app on top.
+</p>
 
-The Flet frontend provides a modern gaming experience across Windows, macOS, Linux, Android, iOS, and web.
+<p align="center">
+  <a href="https://github.com/abhishekbiswas772/GBA_Python/actions/workflows/ci.yml"><img src="https://github.com/abhishekbiswas772/GBA_Python/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/abhishekbiswas772/GBA_Python/actions/workflows/release.yml"><img src="https://github.com/abhishekbiswas772/GBA_Python/actions/workflows/release.yml/badge.svg" alt="Release" /></a>
+  <img src="https://img.shields.io/badge/python-3.13+-3776AB?logo=python&logoColor=white" alt="Python 3.13+" />
+  <img src="https://img.shields.io/badge/pure-python-FFD43B?logo=python&logoColor=black" alt="Pure Python" />
+  <img src="https://img.shields.io/badge/platforms-windows%20%C2%B7%20linux-3D55D6" alt="Windows and Linux" />
+  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-9FD356" alt="PRs welcome" /></a>
+</p>
 
----
+<p align="center">
+  <a href="#-quick-start">Quick start</a> ·
+  <a href="#-the-four-cores">Cores</a> ·
+  <a href="#-controls">Controls</a> ·
+  <a href="#-speed">Speed</a> ·
+  <a href="#-how-it-works">How it works</a> ·
+  <a href="#-tests">Tests</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
 
-## Features
+<p align="center">
+  <img src="docs/systems.png" width="900" alt="One frame from each core: DMG Acid2 on Game Boy, CGB Acid2 on Game Boy Color, a Hello world test ROM on Game Boy Advance, and the blargg CPU timing test passing on NES" />
+</p>
 
-### Game Boy / Game Boy Color (`src/core/gameboy/`)
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/demo.gif" width="360" alt="The Game Boy core running an original scene" /><br/><sub><b>Game Boy</b>: an original scene</sub></td>
+    <td align="center"><img src="docs/nes.gif" width="300" alt="The NES core running blargg's CPU timing, sprite hit and palette tests" /><br/><sub><b>NES</b>: working through blargg's hardware tests</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/color.gif" width="300" alt="CGB Acid2 drawn by the emulator" /><br/><sub><b>Game Boy Color</b>: CGB Acid2</sub></td>
+    <td align="center"><img src="docs/advance.gif" width="340" alt="The GBA core showing Hello world" /><br/><sub><b>Game Boy Advance</b>: open test ROM</sub></td>
+  </tr>
+</table>
 
-The Game Boy core supports the original Game Boy and Game Boy Color hardware.
-
-- **CPU:** Game Boy CPU instruction set emulation.
-- **Timer & Interrupts:** Hardware timers and interrupt handling.
-- **PPU:** Pixel Processing Unit for graphics rendering.
-- **Joypad:** Game Boy button input handling.
-- **Cartridge Support:** MBC1, MBC2, MBC3 (including RTC), and MBC5.
-- **Battery Saves:** Persistent cartridge RAM with automatic saving.
-- **APU:** Audio Processing Unit and sound emulation.
-- **DMG Mode:** Original Game Boy compatibility with the classic green palette.
-- **CGB Mode:** Game Boy Color support, including:
-  - Color palettes.
-  - Background tile attributes.
-  - VRAM and WRAM banking.
-  - HDMA (H-Blank DMA).
-  - Double-speed mode.
-
-**Hardware mode detection:**
-
-The emulator automatically detects the hardware mode using the ROM header at address `0x0143`.
-
-| ROM Type | Emulation Mode |
-|---|---|
-| Original Game Boy ROM | DMG |
-| CGB-enhanced ROM | CGB |
-| CGB-only ROM | CGB |
-| Any ROM with `--dmg` | DMG (forced) |
-
-### Game Boy Advance (`src/core/gba/`)
-
-The Game Boy Advance core provides a separate ARM-based emulation implementation.
-
-- **CPU:** ARM7TDMI processor with ARM and THUMB instruction support.
-- **BIOS:** Built-in HLE BIOS; no external BIOS file required.
-- **DMA:** Direct Memory Access support.
-- **Timers:** Hardware timer emulation.
-- **PPU:** Graphics rendering with display modes 0–5:
-  - Text backgrounds.
-  - Affine backgrounds.
-  - Sprites, including affine sprites.
-  - Windows.
-  - Alpha blending and brightness effects.
-  - Mosaic (BG and OBJ).
-- **Audio:**
-  - Direct Sound.
-  - PSG audio channels.
-- **Cartridge Saves:**
-  - SRAM.
-  - Flash 64K / 128K.
-  - EEPROM.
-- **Save Detection:** Save type automatically detected from the ROM.
-- **Real-time clock:** cartridge GPIO + Seiko S-3511 RTC (Pokemon Ruby / Sapphire / Emerald, Boktai, ...),
-  detected from the ROM, using the computer's clock.
-- **Self-modifying code:** the instruction prefetch is emulated (Classic NES Series).
-- **Persistent Storage:** Cartridge saves stored as `<rom>.sav`.
-
-GBA ROMs (`.gba`) are automatically routed to the GBA emulator core.
+<p align="center">
+  <sub>Every frame above is drawn by this emulator, running open test ROMs. No commercial game is shown or shipped.
+  Regenerate them yourself with <code>uv run python docs/make_media.py</code>.</sub>
+</p>
 
 ---
 
-## Emulator UI (Flet)
+## ✨ Highlights
 
-The graphical interface is built using [Flet](https://flet.dev/) and runs all three systems (GB, GBC, GBA) through `src/bridge/`.
+- **Four cores, zero native code.** The Game Boy, Game Boy Color, GBA and NES are all written in Python, using only the standard library.
+- **Accurate where it counts.** The cores pass the nestest trace line by line, blargg's CPU, APU, PPU and MMC3 suites, Acid2, and jsmolka's GBA tests.
+- **Smooth when Python is slow.** A worker thread paces itself on the audio clock. Auto-frameskip keeps the game and the sound at 100% when drawing can't keep up.
+- **A real library app.**
+  - Cover previews are generated automatically and replaced by your last frame after you play.
+  - Four themes.
+  - Each system has its own key layout.
+  - Gamepads and touch controls are supported.
+- **Battery saves that just work.** They are written atomically next to the ROM, about every 10 seconds and again when you quit.
 
-The application uses a single codebase targeting:
+---
 
-- Windows
-- macOS
-- Linux
-- Android
-- iOS
-- Web browsers
+## 🚀 Quick start
 
-Input from keyboard, gamepads and touch goes through the adaptors in `src/bridge/adaptors/`.
-The default theme is **Daylight**.
+```bash
+git clone https://github.com/abhishekbiswas772/GBA_Python.git
+cd GBA_Python
+uv sync
+uv run python main.py          # opens the library
+```
 
-### UI Features
-
-- Game library management.
-- ROM scanning and loading.
-- Interactive emulator player.
-- Multiple visual themes.
-- Game Boy-inspired color palettes.
-- Custom pixel-art icons and splash screens.
-- Settings and save-path management.
-- Screenshots and game moments.
-- Responsive layouts for different screen sizes.
-- Keyboard, gamepad (Xbox / PlayStation / Switch Pro / generic) and touch controls.
-
-### UI Architecture
+Drop your games into the `rom/` folders. It is git-ignored, so your ROMs never get committed.
 
 ```text
-src/ui/
-│
-├── main.py, __main__.py     # Application entry points
-├── app.py                   # Page setup, routing, themes, toasts
-├── state.py                 # Transient view state
-│
-├── theme/
-│   ├── Design tokens
-│   ├── Four themes
-│   ├── Game Boy palettes
-│   ├── Shaders
-│   └── Bundled fonts
-│
-├── components/
-│   ├── UI primitives
-│   ├── Text and buttons
-│   ├── Segmented controls
-│   ├── Toggles
-│   ├── Layout bars
-│   ├── Panels
-│   └── Grids
-│
-├── views/
-│   ├── library.py
-│   ├── player.py
-│   ├── settings.py
-│   ├── moments.py
-│   ├── appearance.py
-│   └── together.py
-│
-├── emulator/
-│   ├── Session management
-│   ├── Emulator core integration
-│   ├── Frame loop
-│   ├── Input handling
-│   ├── Audio handling
-│   └── Frame encoding
-│
-├── data/
-│   ├── Settings persistence
-│   ├── ROM library scanning
-│   ├── Moments
-│   └── Sample data
-│
-├── tools/
-│   └── make_icons.py
-│
-└── assets/
-    ├── icons
-    └── fonts/
-        ├── Silkscreen
-        ├── Outfit
-        └── JetBrains Mono
+rom/
+├── gb/         .gb
+├── gb_color/   .gbc
+├── gba/        .gba
+└── nes/        .nes
 ```
 
-### UI Implementation Details
+You can also point **Settings → Paths & Saves** at a folder you already have. `~/Games/ROMs` is picked up automatically.
 
-- Every view follows the `build(app) -> ft.Control` interface.
-- Views are rebuilt when application state changes.
-- The player's screen image is the only persistent UI control and is updated in place for every emulated frame.
-- Settings, thumbnails, and screenshots are stored in Flet's application storage directory when packaged.
-- During local development, application data is stored in `~/.gba_python`.
+<details>
+<summary><b>More ways to launch</b></summary>
 
-**Splash screen:**
+```bash
+uv run python main.py app rom/gba/game.gba   # library, straight into a game
+uv run python main.py game.nes               # lightweight pygame window
+uv run python main.py run game.gba --frames 600   # headless, prints the speed
+uv run python main.py info game.nes          # cartridge header
+```
 
-Once Flutter has loaded, the application displays its own splash screen (`views/splash.py`) while settings are loaded and ROM directories are scanned.
+Paths can be relative to `rom/` (`main.py nes/game.nes`).
 
-The splash screen remains visible for at least `SPLASH_MIN_SECONDS`, configured in `app.py`.
+| Flag | Does |
+|---|---|
+| `--mute --scale 4` | quiet, 4× window |
+| `--keys app` | desktop-app key layout inside the pygame window |
+| `--dmg` | play a Color cart on the original green LCD |
+| `--bios path/to/bios.bin` | optional real GBA BIOS (the built-in HLE BIOS is the default) |
 
-**Layout compatibility:**
+</details>
 
-Flet 1.1's `aspect_ratio` implementation causes layout issues on the web. Therefore, component dimensions are calculated explicitly instead of relying on `aspect_ratio`.
+Prebuilt **Windows** and **Linux** apps are attached to every [release](https://github.com/abhishekbiswas772/GBA_Python/releases).
 
 ---
 
-## Requirements
+## 🎮 The four cores
 
-- Python 3.13+
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
-- Flet (`flet[all]`) for the desktop app, pygame for the play window / audio / gamepads
-- pytest for the tests
+| | Game Boy | Game Boy Color | Game Boy Advance | NES |
+|---|---|---|---|---|
+| **CPU** | Sharp LR35902 | same, double speed | ARM7TDMI (ARM + Thumb) | Ricoh 2A03 (6502), all 256 opcodes |
+| **Picture** | 160×144, 4 shades | palettes, banks, HDMA | modes 0–5, affine, blend, mosaic | 256×240, scanline renderer, sprite-0 hit |
+| **Sound** | 4-channel APU | same | PSG + Direct Sound | 2 pulse, triangle, noise, DMC |
+| **Carts** | MBC1/2/3 + RTC, MBC5 | CGB header detection | SRAM, Flash 64K/128K, EEPROM, RTC | NROM, MMC1, UxROM, CNROM, AxROM, Color Dreams, GxROM, MMC3 |
+| **Boot** | no boot ROM needed | auto, or `--dmg` | built-in HLE BIOS | iNES / NES 2.0 headers |
 
-Install everything (creates `.venv`):
+The file extension picks the core. Together, the supported NES mappers cover most of the NES library.
 
-```bash
-uv sync
-```
+<details>
+<summary><b>What each core covers in detail</b></summary>
 
-(or `pip install -r requirements.txt`)
+**Game Boy / Color.**
+- Full CPU, timer, interrupts, joypad, PPU and APU.
+- Cartridges: MBC1, MBC2, MBC3 with RTC, and MBC5, with battery RAM.
+- Color mode adds palettes, background attributes, VRAM and WRAM banking, HDMA and double speed.
+
+**Game Boy Advance.**
+- CPU: ARM7TDMI with ARM and Thumb, including the prefetch that self-modifying carts rely on.
+- DMA and timers.
+- PPU modes 0–5: text and affine backgrounds, affine sprites, windows, alpha and brightness, mosaic.
+- Audio: Direct Sound plus the PSG.
+- Saves are detected from the ROM: SRAM, Flash 64K/128K, EEPROM.
+- Cartridge GPIO drives a Seiko S-3511 real-time clock.
+
+**NES.**
+- CPU: a generated 6502 interpreter with every official and unofficial opcode. Cycle counts match nestest exactly.
+- PPU:
+  - catch-up scanline renderer with cached nametable rows;
+  - sprite-0 hit timed to the dot;
+  - the vblank and NMI races;
+  - odd-frame skip.
+- APU: pulse with sweep, triangle, noise LFSR, DMC with its sample buffer and IRQ, and a 4/5-step frame sequencer with the frame IRQ.
+- MMC3 scanline IRQ, clocked from PPU A12.
+
+</details>
 
 ---
 
-## Running
+## 🕹 Controls
 
-All launching goes through `main.py`:
-
-```bash
-uv run python main.py                       # desktop app
-uv run python main.py app rom/gba/game.gba  # desktop app, straight into a game
-uv run python main.py game.gba              # play in a lightweight pygame window
-uv run python main.py run game.gba --frames 600   # headless, prints emulation speed
-uv run python main.py info game.gbc         # cartridge / save info
-uv run python main.py --help
-```
-
-The system (GB, GBC or GBA) is detected from the file. ROM paths may be given relative to the
-`rom/` folder (`main.py gba/game.gba`). Useful options for `play` / `run`:
-
-```bash
---mute --scale 4            # no audio, 4x window
---keys app                  # use the desktop app key layout in the play window
---dmg                       # GB: run a CGB-enhanced ROM in original Game Boy mode
---bios path/to/bios.bin     # GBA: real BIOS dump (default: built-in HLE BIOS)
---doctor log.txt --steps N  # GB: Gameboy Doctor trace (headless)
-```
-
-### ROM library
-
-The desktop app lists ROMs from `rom/` next to `main.py` (created automatically, with `gb/`,
-`gb_color/` and `gba/` subfolders), from `~/Games/ROMs`, and from folders added under
-**Settings -> Paths & Saves**. `main.py app --roms DIR` adds a folder for one session.
-
-### Controls
-
-| Console | Desktop app (default) | Play window (`--keys classic`) | Gamepad |
+| Button | Desktop app | Play window | Gamepad |
 |---|---|---|---|
-| D-pad | WASD / arrows | Arrows | D-pad / left stick |
+| D-pad | WASD / arrows | Arrows | D-pad or left stick |
 | A / B | K / J | X / Z | A / B |
-| L / R (GBA) | Q / E | A / S | LB / RB or triggers |
+| L / R *(GBA)* | Q / E | A / S | LB / RB or triggers |
 | Start | Enter | Enter | Menu |
 | Select | Backspace | Right Shift / Backspace | View |
+| Fast-forward | F | | |
 
-Desktop keys can be rebound under **Settings -> Controls**. Touch devices get an on-screen pad.
-
-### Web / mobile
-
-```bash
-flet run --web src/ui/main.py
-```
-
-Sound and gamepads need the desktop app (SDL through pygame).
+GB, GBC, GBA and NES each keep their **own** layout under **Settings → Controls**. Keyboard, Xbox / PlayStation / Switch-style pads, and the on-screen touch pad all feed one input router. Taps shorter than a frame still register.
 
 ---
 
-## Building the Application
+## ⚡ Speed
 
-Flet supports building the application for multiple platforms.
+Pure Python, measured with `docs/make_media.py` on a laptop. Results are in [`docs/benchmark.json`](docs/benchmark.json).
 
-### Supported Targets
+| Core | Frames/s, drawing every frame | Frames/s, frameskip | Real time |
+|---|---:|---:|---:|
+| Game Boy | ~104 | ~146 | **~170%** |
+| Game Boy Color | ~97 | ~144 | **~160%** |
+| Game Boy Advance, light scene | ~87 | ~90 | **~145%** |
+| NES | ~225 | ~262 | **~370%** |
+| NES, synthetic worst case | ~189 | ~296 | **~315%** |
 
-| Platform | Build Target |
-|---|---|
-| Windows | `windows` |
-| macOS | `macos` |
-| Linux | `linux` |
-| Android APK | `apk` |
-| Android App Bundle | `aab` |
-| iOS | `ipa` |
-| Web | `web` |
+The NES worst case is a full screen of random tiles, 64 sprites, scrolling every frame, OAM DMA and a busy CPU.
 
-### Build Commands
+Heavy GBA scenes, with lots of blending plus Direct Sound, drop to about 50–60% drawn. Auto-frameskip then keeps the game and the audio at full speed and draws about 20–30 fps.
+
+```mermaid
+xychart-beta
+    title "Real-time speed (%), higher is better"
+    x-axis ["GB", "GBC", "GBA light", "NES", "NES worst case"]
+    y-axis "% of real hardware" 0 --> 400
+    bar [170, 160, 145, 370, 315]
+```
+
+---
+
+## 🧠 How it works
+
+```mermaid
+flowchart LR
+    subgraph UI["src/ui · Flet app"]
+        L[Library + previews] --> P[Player]
+        S[Settings · per-system keys]
+    end
+    subgraph Bridge["src/bridge"]
+        R["EmulatorRunner<br/>worker thread · audio-clock pacing · auto-frameskip"]
+        M{{"Machine API<br/>run_frame · press · frame_rgb · apu"}}
+        I["Input router<br/>keyboard · gamepad · touch"]
+    end
+    subgraph Cores["src/core"]
+        GB[gameboy<br/>DMG + CGB]
+        GBA[gba<br/>ARM7TDMI]
+        NES[nes<br/>2A03 + 2C02]
+    end
+    P --> R --> M
+    I --> R
+    M --> GB & GBA & NES
+    R -- "frames (async)" --> P
+    R -- "int16 stereo 44.1 kHz" --> A[(SDL audio)]
+```
+
+<details>
+<summary><b>Why it's fast enough in Python</b></summary>
+
+- **Generated interpreters.** The 6502 loop is written once as source and compiled with `exec`. Registers live in local variables, dispatch is a binary `if` tree over the opcode, and RAM/ROM reads are inlined.
+- **Catch-up timing.** The CPU runs until the next point where something must happen on time: an end of line, vblank, an MMC3 clock or an APU IRQ. The PPU and APU then catch up, and register accesses sync them to the exact cycle.
+- **Scanline rendering with caches.** Background rows are cached by (tiles, attributes, fine Y, CHR banks), so static screens cost almost nothing.
+- **Frameskip that doesn't cheat.** `run_frame(render=False)` still runs everything except drawing. Timing, sprite-0 hits and sound are identical.
+- **Audio-clocked pacing.** The runner keeps about 95 ms of sound queued. When the queue drops below 60 ms it skips drawing (up to 3 frames in a row) instead of letting the audio crackle.
+
+</details>
+
+<details>
+<summary><b>Project layout</b></summary>
+
+```text
+main.py                  launcher and flet build entry
+src/core/gameboy/        DMG and CGB
+src/core/gba/            ARM, PPU, APU, DMA, timers, HLE BIOS, RTC
+src/core/nes/            6502 CPU, PPU, APU, mappers, cartridge
+src/bridge/              Machine API, EmulatorRunner, keyboard / gamepad / touch adaptors
+src/ui/                  Flet app (library, player, settings, themes)
+tests/roms/              open test ROMs: blargg, Acid2, jsmolka, nes-test-roms
+docs/                    README media and make_media.py
+rom/                     yours, git-ignored
+```
+
+Settings, thumbnails and screenshots are stored in `~/.gba_python` while you develop, and in the app storage directory once packaged.
+
+</details>
+
+---
+
+## 🧪 Tests
 
 ```bash
-# Windows
+uv run python -m pytest -q             # fast suite: unit tests, nestest, GBA test ROMs
+uv run python -m pytest -q --slow      # + blargg (GB and NES), Acid2, MMC3, APU, sprite hit
+uv run python -m tests.run_tests       # Game Boy blargg speed report
+```
+
+| Suite | Status |
+|---|---|
+| nestest (8,991 traced instructions) | ✅ exact match |
+| blargg NES: `instr_test`, `instr_timing`, `branch_timing`, `cpu_timing` | ✅ |
+| blargg NES: `apu_test` (8/8), sprite hit (8/8), PPU memory, `vbl_clear_time` | ✅ |
+| blargg MMC3 IRQ: clocking, details, A12 | ✅ (scanline timing: in progress) |
+| blargg `ppu_vbl_nmi` | 9/10 (even/odd frame timing in progress) |
+| blargg Game Boy `cpu_instrs`, DMG Acid2, CGB Acid2, jsmolka GBA | ✅ |
+
+Commercial carts are optional, and those tests are skipped when `rom/` is empty. They run from a temporary copy, so a real `.sav` is never touched.
+
+---
+
+## 📦 Build
+
+```bash
 flet build windows
-
-# macOS
-flet build macos
-
-# Linux
 flet build linux
-
-# Android APK
-flet build apk
-
-# Android App Bundle
-flet build aab
-
-# iOS
-flet build ipa
-
-# Web
-flet build web
 ```
 
-**Build requirements:**
-
-- Desktop builds must run on their respective operating systems.
-- iOS builds require macOS and Xcode.
-- Android builds require the Android SDK, which Flet can download.
-- The build must be executed from the repository root so that `src/` and the required application resources are bundled.
-- Use `src/ui/main.py` as the application entry module.
-
-### Application Assets
-
-Flet reads the following assets during the build process:
-
-| Asset | Purpose |
-|---|---|
-| `assets/icon.png` | Application icon |
-| `assets/splash.png` | Native splash screen |
-| `assets/favicon.png` | Web favicon |
-| `icon.ico` | Windows window icon |
-
-All assets are generated from a single 16×16 pixel-art sprite.
-
-To regenerate the assets:
-
-```bash
-python -m src.ui.tools.make_icons
-```
-
-Modify `SPRITE` or `PALETTE` in `src/ui/tools/make_icons.py` before regenerating the icons.
+Push a tag like `v0.2.0` and GitHub Actions builds both apps and publishes them to a release. CI runs the test suite on Linux with a real X11 server and PulseAudio.
 
 ---
 
-## Battery Saves and Persistence
+## 🧭 Honest limits
 
-The emulator supports persistent cartridge saves.
-
-For Game Boy and Game Boy Color:
-
-- Battery-backed cartridge RAM is saved next to the ROM.
-- Save files use the `.sav` extension.
-- Autosaving occurs approximately every 10 seconds.
-- The emulator also saves data when exiting.
-
-Example:
-
-```text
-game.gb
-game.gb.sav
-```
-
-For Game Boy Advance:
-
-- SRAM, Flash 64K/128K, and EEPROM are supported.
-- Save types are automatically detected from the ROM.
-- Save files are stored as `<rom>.sav`.
-
-The UI also stores application settings, thumbnails, and screenshots in its application storage directory when packaged, or in `~/.gba_python` during local development.
+- Save states, rewind, video, clips, cheats, achievements and link play have buttons in the UI, but the cores don't snapshot yet. The buttons say so.
+- Sound uses SDL through pygame, so it works in the desktop app only.
+- The NES core is NTSC only. PAL and mappers beyond the ones listed above are welcome contributions.
 
 ---
 
-## Testing
+## 🤝 Contributing
 
-The project includes unit tests, hardware compatibility tests, and ROM-based integration tests.
+Bug reports, test-ROM results and pull requests are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the setup, the project conventions, and how to add a mapper or a test.
 
-### Run Unit Tests
+## ⚖️ Legal
 
-```bash
-.venv/Scripts/python -m pytest -q
-```
+This project does not include, distribute or link to copyrighted ROMs or a Nintendo BIOS. Play games you own. The GBA core boots from a built-in high-level BIOS; a real BIOS dump is optional and never shipped.
 
-### Run Extended Tests
+The bundled test ROMs keep their authors' terms:
 
-```bash
-.venv/Scripts/python -m pytest -q --slow
-```
+- CGB/DMG Acid2: MIT, Matt Currie.
+- GBA tests: MIT, jsmolka.
+- The blargg Game Boy and NES tests and nestest come from the community [nes-test-roms](https://github.com/christopherpow/nes-test-roms) collection.
 
-The extended test suite includes:
-
-- Blargg tests (DMG and CGB).
-- DMG Acid2.
-- CGB Acid2.
-- ROM smoke tests.
-
-### Blargg ROM Test Runner
-
-```bash
-.venv/Scripts/python -m tests.run_tests
-```
-
-This runs Blargg ROM tests in both DMG and CGB modes and provides an execution speed report.
-
-### Test ROMs
-
-Test ROMs are stored in:
-
-```text
-tests/roms/
-```
-
-The test suite includes:
-
-- Blargg compatibility ROMs.
-- DMG Acid2.
-- CGB Acid2.
-- GBA test ROMs.
-
-CGB Acid2 is developed by Matt Currie and distributed under the MIT License. See `cgb-acid2-LICENSE.txt`.
-
-ROM-based tests that need commercial ROMs in `rom/` (`.gb` / `.gbc` / `.gba`) are skipped if they are absent;
-they always run on a temporary copy so your real `.sav` files are never touched.
-
-Tests run against temporary copies of ROMs to ensure the original battery-backed `.sav` files are not modified.
-
-### GBA Tests
-
-GBA tests are located in:
-
-```text
-tests/test_gba.py
-tests/roms/gba/
-```
-
-The GBA test suite uses test ROMs from jsmolka's `gba-tests` project, distributed under the MIT License.
-
----
-
-## Current Limitations and Future Development
-
-Some features are currently available in the UI as previews but are not yet implemented in the emulator core.
-
-### UI Features Not Yet Implemented
-
-| Feature | Status |
-|---|---|
-| Save States | UI preview only |
-| Rewind | UI preview only |
-| Video Recording | UI preview only |
-| Clip Recording | UI preview only |
-| Cheats | UI preview only |
-| Achievements | UI preview only |
-| Link Play | UI preview only |
-
-Clicking these options currently displays an informational notice.
-
-Save states and rewind require emulator-core snapshot support, which is not currently available.
-
-### Audio Limitations
-
-Audio output uses SDL through Pygame. Consequently, sound is currently supported only in desktop builds.
-
-### Performance
-
-Everything is pure Python. Emulation speed depends on the scene:
-
-| | Typical speed |
-|---|---|
-| Game Boy / Color | ~100-150 % (full speed) |
-| GBA, light scenes / intros | ~100-185 % |
-| GBA, busy scenes with blending + sound (e.g. Minish Cap menus) | ~50-60 % (25-35 fps) |
-
-The app itself adds about 2 ms per frame; the time goes into the CPU and PPU emulation.
-
----
-
-## Project Structure
-
-```text
-project-root/
-├── main.py                   # launcher: desktop app / play window / headless / info
-├── pyproject.toml
-├── rom/                      # your ROMs (git-ignored; gb/, gb_color/, gba/)
-├── src/
-│   ├── core/
-│   │   ├── gameboy/          # Game Boy / Game Boy Color core
-│   │   └── gba/              # Game Boy Advance core (CPU, PPU, APU, DMA, timers, BIOS, RTC)
-│   ├── bridge/               # one Machine API over both cores (used by the app)
-│   │   └── adaptors/         # input: keyboard, console_controller (gamepads), mobile (touch)
-│   └── ui/                   # Flet application
-│       ├── app.py, main.py, state.py
-│       ├── views/, components/, theme/, emulator/, data/, tools/, assets/
-└── tests/                    # unit + ROM tests (tests/roms/ holds the open-source test ROMs)
-```
-
----
-
-## License and Third-Party Components
-
-Third-party test ROMs and dependencies retain their respective licenses.
-
-- CGB Acid2: MIT License (Matt Currie).
-- GBA Tests: MIT License (jsmolka).
-- Silkscreen, Outfit, and JetBrains Mono fonts are distributed under their respective font licenses.
-
-Refer to the individual license files and third-party project documentation for details.
-
----
-
-## Project Goals
-
-The primary goal is to build a cross-platform retro gaming emulator with accurate hardware emulation and a modern, accessible user interface.
-
-The project is designed around three major components:
-
-1. **Emulation Core:** Accurate Game Boy, Game Boy Color, and Game Boy Advance hardware emulation.
-2. **Cross-Platform UI:** A unified Flet application for desktop, mobile, and web.
-3. **Extensibility:** A modular architecture that allows additional hardware features, debugging tools, and gaming experiences to be integrated over time.
-
+Silkscreen, Outfit and JetBrains Mono keep their own font licenses. "Game Boy", "NES" and related names are trademarks of Nintendo. This project is not affiliated with or endorsed by Nintendo.

@@ -1,6 +1,7 @@
 """Small building blocks shared by every screen. All take the active Theme `t`."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import Callable, Iterable, Sequence
 
 import flet as ft
@@ -9,6 +10,34 @@ from src.ui.theme import Theme, family
 from src.ui.theme.fonts import display_size
 
 Handler = Callable | None
+
+# While building the player screen, controls are made non-focusable. Flutter's
+# focus system otherwise turns game keys into UI actions: arrows / Tab move
+# focus onto a button, Enter / Space then *click* it (Start = Enter would hit
+# Reset or Pause), and Left / Right nudge a focused slider.
+_NO_FOCUS = False
+
+
+@contextmanager
+def unfocusable():
+    """Build buttons / checkboxes inside this block as plain tap targets that
+    can never take keyboard focus (they still work with mouse and touch)."""
+    global _NO_FOCUS
+    old, _NO_FOCUS = _NO_FOCUS, True
+    try:
+        yield
+    finally:
+        _NO_FOCUS = old
+
+
+def tap(content: ft.Control, on_click: Handler, *, tooltip: str | None = None, expand=None,
+        col=None) -> ft.GestureDetector:
+    """A clickable area that never takes keyboard focus."""
+    return ft.GestureDetector(
+        content=content, on_tap=on_click,
+        mouse_cursor=ft.MouseCursor.CLICK if on_click else None,
+        tooltip=tooltip, expand=expand, col=col if col is not None else 12,
+    )
 
 
 def alpha(color: str, opacity: float) -> str:
@@ -137,6 +166,14 @@ def button(content: str | ft.Control | Sequence[ft.Control], on_click: Handler, 
     else:
         body = content
 
+    if _NO_FOCUS:
+        box = ft.Container(
+            body, bgcolor=bg, height=height, width=width, padding=pad(h_pad, 0),
+            border_radius=radius, border=border(side) if side else None,
+            alignment=align or ft.Alignment.CENTER, expand=expand, opacity=0.4 if disabled else None,
+        )
+        return tap(box, None if disabled else on_click, tooltip=tooltip, expand=expand, col=col)
+
     style = ft.ButtonStyle(
         bgcolor=bg, color=fg, elevation=0, padding=pad(h_pad, 0),
         shape=ft.RoundedRectangleBorder(radius=radius),
@@ -179,7 +216,12 @@ def segmented(items: Iterable[tuple[str, str]], value: str, on_pick: Callable[[s
     )
 
 
-def checkbox(value: bool, on_change: Callable[[bool], None] | None, t: Theme, label: str = "") -> ft.Checkbox:
+def checkbox(value: bool, on_change: Callable[[bool], None] | None, t: Theme, label: str = "") -> ft.Control:
+    if _NO_FOCUS:
+        mark = ft.Icon(ft.Icons.CHECK_BOX if value else ft.Icons.CHECK_BOX_OUTLINE_BLANK,
+                       color=t.accent if value else t.muted, size=22, semantics_label=label or None)
+        return tap(ft.Container(mark, padding=4),
+                   (lambda e: on_change(not value)) if on_change else None)
     return ft.Checkbox(
         value=value, semantics_label=label or None,
         on_change=(lambda e: on_change(bool(e.control.value))) if on_change else None,

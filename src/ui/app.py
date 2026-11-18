@@ -38,6 +38,7 @@ class App:
         self.games: list[lib.Game] = []
         self._wide: bool | None = None
         self.ready = False          # renders wait until the splash has finished
+        self.previews = self._preview_maker()
         self.rescan()
 
         page.on_resize = self._on_resize
@@ -84,6 +85,26 @@ class App:
     def rescan(self) -> None:
         rom = LAUNCH.get("rom")
         self.games = lib.scan(self.settings, LAUNCH.get("dirs", ()), [rom] if rom else ())
+        if self.previews is not None:
+            self.previews.queue_games(self.games)      # screenshots for never-played games
+
+    def _preview_maker(self):
+        """Background library previews (desktop only: web / mobile are too slow)."""
+        if self.is_web or self.is_mobile:
+            return None
+        from src.ui.emulator.previews import PreviewMaker
+        from src.ui.theme import GB_PALETTES
+        pal = GB_PALETTES.get(self.settings.gb_palette, GB_PALETTES["pea"]).rgb()
+
+        def ready(path: str) -> None:                   # preview thread -> UI loop
+            async def put() -> None:
+                from src.ui.views.library import show_preview
+                show_preview(self, path)
+            try:
+                self.page.run_task(put)
+            except Exception:
+                pass
+        return PreviewMaker(on_ready=ready, palette=pal)
 
     def game_by_path(self, path: str) -> lib.Game | None:
         return next((g for g in self.games if g.path == path), None)
@@ -91,19 +112,25 @@ class App:
     # ------------------------------------------------------------------ routing
     def go(self, route: str) -> None:
         assert route in ROUTES, route
+        playing = self.session.game.system if self.session else None
         if route != "player":
             self.close_session()
-        if route == "settings" and self.ui.draft_keyboard is None:
-            self.ui.draft_keyboard = {k: list(v) for k, v in self.settings.keyboard.items()}
+        if route == "settings" and self.ui.draft_keyboards is None:
+            self.ui.draft_keyboards = {sysname: {b: list(k) for b, k in m.items()}
+                                       for sysname, m in self.settings.keyboards.items()}
             self.ui.draft_hotkeys = dict(self.settings.hotkeys)
+            if playing:                           # Controls opened from a game: show its system
+                self.ui.settings_system = playing
         if route != "settings":
-            self.ui.draft_keyboard = self.ui.draft_hotkeys = None
+            self.ui.draft_keyboards = self.ui.draft_hotkeys = None
             self.ui.listening = None
         self.route = route
         self.render()
 
     def play(self, game: lib.Game) -> None:
         self.close_session()
+        if self.previews is not None:
+            self.previews.busy.set()                    # previews wait while you play
         self.session = EmulatorSession(self.page, game, self.settings)
         self.ui.toast = None
         self.ui.recording = False
@@ -115,6 +142,8 @@ class App:
         if self.session:
             self.session.close()
             self.session = None
+            if self.previews is not None:
+                self.previews.busy.clear()
             self.rescan()           # refresh play history
             if self.page.window and self.page.window.full_screen:
                 self.page.window.full_screen = False

@@ -2,11 +2,14 @@
 
     python -m src.ui.tools.make_icons
 
-Writes into src/ui/assets/:
-    icon.png      1024x1024, dark rounded tile  (flet build: app icon on every platform)
+Writes into src/ui/assets/ (runtime fonts live beside these; the window icon too):
+    icon.png      1024x1024, dark rounded tile
     icon.ico      256x256 PNG-in-ICO            (Windows window/taskbar icon)
     favicon.png   256x256, dark rounded tile    (web tab icon)
-    splash.png    512x512, transparent          (flet build: native splash screen)
+    splash.png    512x512, transparent
+
+Also copies icon.png, favicon.png and splash.png to assets/ at the repo root.
+`flet build` reads that directory for the native icon and splash screen.
 """
 from __future__ import annotations
 
@@ -16,6 +19,7 @@ from pathlib import Path
 from src.ui.emulator.frame import encode_png
 
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
+PACKAGED = Path(__file__).resolve().parents[3] / "assets"
 
 # B body (accent), D dark ink, G screen, L screen highlight, . transparent
 SPRITE = [
@@ -98,8 +102,13 @@ def main() -> None:
     (ASSETS / "favicon.png").write_bytes(fav)
     (ASSETS / "icon.ico").write_bytes(ico(fav))
     (ASSETS / "splash.png").write_bytes(png(512, 512, tile=False))
+    PACKAGED.mkdir(parents=True, exist_ok=True)
+    for name in ("icon.png", "favicon.png", "splash.png"):
+        (PACKAGED / name).write_bytes((ASSETS / name).read_bytes())
     for name in ("icon.png", "icon.ico", "favicon.png", "splash.png"):
         print(f"wrote {ASSETS / name}")
+    for name in ("icon.png", "favicon.png", "splash.png"):
+        print(f"wrote {PACKAGED / name}")
 
 
 if __name__ == "__main__":

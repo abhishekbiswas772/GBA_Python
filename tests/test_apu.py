@@ -1,8 +1,4 @@
-"""APU unit tests (fast, headless; never init the mixer)."""
-import os
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-
+"""APU unit tests (fast; never init the mixer)."""
 from src.core.gameboy.apu import APU, CYCLES_PER_SECOND, FS_PERIOD, NoiseChannel, PulseChannel
 from src.core.gameboy.cartridge import Cartridge
 from src.core.gameboy.mmu import MMU

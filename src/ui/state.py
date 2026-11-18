@@ -18,8 +18,9 @@ class UIState:
     # settings
     settings_section: str = "Controls"
     settings_device: str = "kb"      # kb | pad
+    settings_system: str = "GBA"     # GB | GBC | GBA | NES: which keyboard layout is being edited
     listening: tuple[str, str] | None = None   # ("button", "Up", col) / ("hotkey", id)
-    draft_keyboard: dict[str, list[str]] | None = None
+    draft_keyboards: dict[str, dict[str, list[str]]] | None = None   # system -> button -> keys
     draft_hotkeys: dict[str, str] | None = None
     # moments
     moments_filter: str = "all"      # all | CLIP | GIF | SHOT

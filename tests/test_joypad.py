@@ -1,7 +1,3 @@
-import os
-
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-
 import pygame
 
 from src.core.gameboy.display import KEYMAP, joypad_key_handler
@@ -249,7 +245,7 @@ def test_cpu_joypad_interrupt_rom(tmp_path):
     assert gb.mmu.serial_text() == "18"
 
 
-# --- keyboard events (dummy SDL video driver, no real window) ---------------
+# --- keyboard events --------------------------------------------------------
 
 def test_key_events_route_to_joypad():
     joy, mmu = make_joypad()

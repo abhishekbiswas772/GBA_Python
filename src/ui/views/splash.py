@@ -84,7 +84,7 @@ def build(t: Theme, app_name: str, version: str, loader: RetroLoader) -> ft.Cont
             logo,
             ft.Container(height=8),
             c.text(app_name, size=38, weight=700, kind="display", color=t.text, align=ft.TextAlign.CENTER),
-            c.mono("GB · GBC · GBA", t, size=13, spacing=2),
+            c.mono("GB · GBC · GBA · NES", t, size=13, spacing=2),
             ft.Container(height=28),
             loader.control,
             ft.Container(height=36),

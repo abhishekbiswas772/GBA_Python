@@ -1,4 +1,4 @@
-"""ROM library: finds .gb / .gbc / .gba files and reports their system and play history."""
+"""ROM library: finds .gb / .gbc / .gba / .nes files and reports their system and play history."""
 from __future__ import annotations
 
 import re
@@ -8,17 +8,20 @@ from pathlib import Path
 
 from src.ui.data.settings import Settings
 
-ROM_EXTS = {".gb": "GB", ".gbc": "GBC", ".cgb": "GBC", ".gba": "GBA", ".agb": "GBA"}
+ROM_EXTS = {".gb": "GB", ".gbc": "GBC", ".cgb": "GBC", ".gba": "GBA", ".agb": "GBA", ".nes": "NES"}
 
 # Consoles the bundled core can actually run.
-PLAYABLE = {"GB", "GBC", "GBA"}
+PLAYABLE = {"GB", "GBC", "GBA", "NES"}
+
+# Native screen size per system.
+NATIVE_SIZE = {"GB": (160, 144), "GBC": (160, 144), "GBA": (240, 160), "NES": (256, 240)}
 
 
 @dataclass
 class Game:
     path: str
     title: str
-    system: str          # GB | GBC | GBA
+    system: str          # GB | GBC | GBA | NES
     size: int            # bytes
     last_played: float   # epoch, 0 = never
     seconds: float       # total play time
@@ -90,8 +93,8 @@ def sort_games(games: list[Game], mode: str) -> list[Game]:
     if mode == "title":
         return sorted(games, key=lambda g: g.title.lower())
     if mode == "system":
-        order = {"GB": 0, "GBC": 1, "GBA": 2}
-        return sorted(games, key=lambda g: (order[g.system], g.title.lower()))
+        order = {"GB": 0, "GBC": 1, "GBA": 2, "NES": 3}
+        return sorted(games, key=lambda g: (order.get(g.system, 9), g.title.lower()))
     return sorted(games, key=lambda g: (-g.last_played, g.title.lower()))
 
 

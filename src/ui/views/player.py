@@ -17,7 +17,7 @@ from src.ui.theme.tokens import OVERLAY_BG, OVERLAY_SUB, OVERLAY_TEXT, SCREEN_LA
 if TYPE_CHECKING:
     from src.ui.app import App
 
-NATIVE = {"GB": (160, 144), "GBC": (160, 144), "GBA": (240, 160)}
+NATIVE = {"GB": (160, 144), "GBC": (160, 144), "GBA": (240, 160), "NES": (256, 240)}
 SLOT_KEYS = {1: "F1", 2: "F2", 3: "F3", 4: "—"}
 
 
@@ -32,6 +32,20 @@ def build(app: "App") -> ft.Control:
         app.route = "library"
         from src.ui.views.library import build as library
         return library(app)
+    with c.unfocusable():                # nothing on this screen may steal game keys
+        listener = _build(app, s)
+
+    async def grab_focus() -> None:      # after the page update has mounted the listener
+        await asyncio.sleep(0.05)
+        try:
+            await listener.focus()
+        except Exception:
+            pass
+    app.page.run_task(grab_focus)
+    return listener
+
+
+def _build(app: "App", s) -> ft.KeyboardListener:
     t, ui, wide, settings = app.t, app.ui, app.wide, app.settings
     g = s.game
 
@@ -80,11 +94,12 @@ def build(app: "App") -> ft.Control:
         app.go("moments")
 
     # ---------------------------------------------------------------- keyboard
+    layout = settings.keyboard_for(g.system)     # GB, GBC and GBA each have their own keys
     keys = getattr(s, "keys", None)              # one adaptor per session: re-renders keep held keys
     if keys is None:
-        keys = s.keys = KeyboardAdaptor(s.input, settings.keyboard)
+        keys = s.keys = KeyboardAdaptor(s.input, layout)
     else:
-        keys.set_mapping(settings.keyboard)
+        keys.set_mapping(layout)
     key_to_hot = {norm_key(v): k for k, v in settings.hotkeys.items() if v}
     hot_actions = {
         "pause": toggle_pause, "screenshot": screenshot, "fullscreen": toggle_fullscreen,
@@ -226,9 +241,24 @@ def build(app: "App") -> ft.Control:
     else:
         panel.append(_link(app))
 
-    def on_volume(e) -> None:
-        settings.volume = int(e.control.value)
+    vol_text = c.mono(f"{settings.volume}%", t, size=13, color=t.text)
+
+    def nudge_volume(delta: int) -> None:
+        settings.volume = max(0, min(100, settings.volume + delta))
         s.apply_volume()
+        settings.save()
+        vol_text.value = f"{settings.volume}%"
+        try:
+            vol_text.update()
+        except Exception:
+            pass
+
+    # +/- stepper instead of a Slider: a focused slider eats Left / Right (the d-pad)
+    volume = ft.Row([
+        c.icon_button(ft.Icons.REMOVE, lambda e: nudge_volume(-10), t, "Volume down", size=16, width=36, height=32),
+        ft.Container(vol_text, width=48, alignment=ft.Alignment.CENTER),
+        c.icon_button(ft.Icons.ADD, lambda e: nudge_volume(10), t, "Volume up", size=16, width=36, height=32),
+    ], spacing=2, tight=True)
 
     def on_replay(v: bool) -> None:
         settings.replay_buffer = v
@@ -236,9 +266,7 @@ def build(app: "App") -> ft.Control:
         app.render()
 
     panel.append(ft.Container(ft.Column([
-        c.setting_row("Volume", ft.Slider(value=settings.volume, min=0, max=100, width=150, active_color=t.accent,
-                                          inactive_color=t.line2, thumb_color=t.accent, on_change=on_volume,
-                                          on_change_end=lambda e: settings.save()), t),
+        c.setting_row("Volume", volume, t),
         c.setting_row("Replay buffer (last 60 s)", c.checkbox(settings.replay_buffer, on_replay, t,
                                                               "Replay buffer"), t),
     ], spacing=12), padding=ft.Padding.only(top=16), border=ft.Border.only(top=ft.BorderSide(1, t.line)),
@@ -249,18 +277,28 @@ def build(app: "App") -> ft.Control:
     # ---------------------------------------------------------------- footer
     status_dot = c.dot("#F2A65A" if s.paused else t.gb)
     status_text = c.mono("Paused" if s.paused else "Running", t)
-    fps_text = c.mono(f"{s.fps:.2f} FPS", t)
+    def perf() -> str:
+        st = s.stats
+        if s.paused or not st.fps:
+            return "— FPS"
+        # drawn frames vs. game speed: frameskip keeps the game (and sound) at
+        # full speed when drawing every frame is too slow
+        return f"{st.drawn_fps:.0f} FPS · game {st.speed:.0f}%"
+
+    fps_text = c.mono(perf(), t)
+    shown_error = s.error
 
     def on_status() -> None:
-        if s.error and not s.paused:
+        nonlocal shown_error
+        if s.error != shown_error:          # load failure / crash: show the overlay
+            shown_error = s.error
+            app.render()
             return
-        fps_text.value = f"{s.fps:.2f} FPS"
+        fps_text.value = perf()
         try:
             fps_text.update()
         except Exception:
             pass
-        if s.error:
-            app.render()
     s.on_status = on_status
 
     footer_items = [

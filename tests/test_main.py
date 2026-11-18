@@ -37,7 +37,7 @@ def test_rom_folder_created_with_subfolders(tmp_path, monkeypatch):
     root = tmp_path / "rom"
     monkeypatch.setattr(main, "ROM_DIR", root)
     assert main.ensure_rom_dir() == root
-    assert sorted(p.name for p in root.iterdir()) == ["gb", "gb_color", "gba"]
+    assert sorted(p.name for p in root.iterdir()) == ["gb", "gb_color", "gba", "nes"]
     main.ensure_rom_dir()                     # idempotent
 
 

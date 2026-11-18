@@ -1,0 +1,22 @@
+{
+  "GB": {
+    "draw": 103.6,
+    "skip": 145.7,
+    "realtime_pct": 173
+  },
+  "GBC": {
+    "draw": 97.3,
+    "skip": 143.8,
+    "realtime_pct": 163
+  },
+  "GBA": {
+    "draw": 87.2,
+    "skip": 90.1,
+    "realtime_pct": 146
+  },
+  "NES": {
+    "draw": 224.6,
+    "skip": 261.7,
+    "realtime_pct": 374
+  }
+}

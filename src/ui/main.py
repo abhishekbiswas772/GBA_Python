@@ -1,4 +1,7 @@
-"""Entry point for `flet run src/ui/main.py` and `flet build` (desktop, mobile, web).
+"""Entry point for `flet run src/ui/main.py` and `python -m src.ui`.
+
+Packaged builds use the repository `main.py` instead. With no arguments that
+opens this same app.
 
 Puts the repository root on sys.path so `src.core.gameboy` (the emulator core) and
 `src.ui` import the same way they do from `python -m src.ui`.

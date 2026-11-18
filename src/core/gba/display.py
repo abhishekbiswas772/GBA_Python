@@ -56,6 +56,7 @@ class Display:
         self.on_key = key_handler(gba)
         self.on_frame = None          # optional callable() before each frame (gamepad polling)
         self.frames = 0
+        self._skipped = 0
         self.audio = None
         if not mute and gba.apu is not None:
             try:
@@ -78,12 +79,24 @@ class Display:
                     break
                 if self.on_frame:
                     self.on_frame()
-                self.gba.run_frame()
+                # frameskip: when the sound queue runs low the game is behind real
+                # time, so run this frame without drawing (game + audio stay 100%)
+                draw = self._skipped >= 3 or not (self.audio and self.audio.started
+                                                  and self.audio.queued() < self.audio.low)
+                self.gba.ppu.skip_render = not draw
+                try:
+                    self.gba.run_frame()
+                finally:
+                    self.gba.ppu.skip_render = False
                 if self.audio:
                     self.audio.pump()
-                self.surface.get_buffer().write(bytes(self.gba.ppu.fb))   # proxy freed at once
-                pygame.transform.scale(self.surface.convert(), self.screen.get_size(), self.screen)
-                pygame.display.flip()
+                if draw:
+                    self._skipped = 0
+                    self.surface.get_buffer().write(bytes(self.gba.ppu.fb))   # proxy freed at once
+                    pygame.transform.scale(self.surface.convert(), self.screen.get_size(), self.screen)
+                    pygame.display.flip()
+                else:
+                    self._skipped += 1
                 self.frames += 1
                 if self.frames % 30 == 0:
                     wall = time.perf_counter() - t0
