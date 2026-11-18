@@ -55,7 +55,11 @@ FLAG_C = 0x10
 R8 = ["b", "c", "d", "e", "h", "l", "(hl)", "a"]
 R16 = ["bc", "de", "hl", "sp"]          
 R16_STACK = ["bc", "de", "hl", "af"]   
-CONDITIONS = ["nz", "z", "nc", "c"]     
+CONDITIONS = ["nz", "z", "nc", "c"] 
+ALU = ["add a,", "adc a,", "sub ", "sbc a,", "and ", "xor ", "or ", "cp "]
+ROT = ["rlc", "rrc", "rl", "rr", "sla", "sra", "swap", "srl"]
+ACC_OPS = ["rlca", "rrca", "rla", "rra", "daa", "cpl", "scf", "ccf"]
+INDIRECT = ["(bc)", "(de)", "(hl+)", "(hl-)"]
 
 
 def signed8(value: int) -> int:
