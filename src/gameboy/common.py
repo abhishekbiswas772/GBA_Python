@@ -96,6 +96,8 @@ IO_READ_OR[0x01] = 0x00      # SB
 IO_READ_OR[0x02] = 0x7E      # SC: only bits 7 and 0 exist
 IO_READ_OR[0x0F] = 0xE0      # IF: upper 3 bits read as 1
 
+HDMA_BLOCK_CYCLES = 32       # real-time T-cycles the CPU is stalled per 16-byte HDMA block
+
 
 # ---------------------------------------------------------------- timer
 TIMER_FREQ_BITS = (9, 3, 5, 7)          # DIV bit watched by TIMA for each TAC clock select
@@ -118,6 +120,8 @@ FRAME_DOTS = LINE_DOTS * 154
 PIXEL_SHIFTS = (7, 6, 5, 4, 3, 2, 1, 0)
 REV = bytes(int(f"{b:08b}"[::-1], 2) for b in range(256))   # bit-reversed byte (sprite X-flip)
 BLANK = bytes(WIDTH)
+STRIP_PRIO = bytes(i & 0x1F for i in range(256))           # CGB: drop BG-to-OBJ priority bit
+WHITE_RGB = b"\xff" * (WIDTH * HEIGHT * 3)                 # CGB: blank 160x144 RGB888 frame
 
 
 # ---------------------------------------------------------------- display

@@ -1,7 +1,5 @@
 from src.gameboy.cartridge import Cartridge
-from src.gameboy.common import IO_READ_OR as _IO_OR
-
-HDMA_BLOCK_CYCLES = 32   # real-time T-cycles the CPU is stalled per 16-byte HDMA block
+from src.gameboy.common import IO_READ_OR as _IO_OR, HDMA_BLOCK_CYCLES
 
 
 class MMU:

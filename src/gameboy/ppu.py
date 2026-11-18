@@ -1,6 +1,7 @@
 from src.gameboy.common import (
     WIDTH, HEIGHT, LINE_DOTS, FRAME_DOTS,
     PIXEL_SHIFTS as _SHIFTS, REV, BLANK,
+    STRIP_PRIO, WHITE_RGB,
 )
 
 _PAIRS: list = [None] * 65536      # lazily-filled tile-row decode cache
@@ -30,8 +31,6 @@ def _palette4(pal: int) -> tuple:
 
 _CGB_ATTR_T = {}            # attr & 0x87 -> translate table for raw colour 0-3
 _CPAIRS = {}                # (lo, hi, attr) -> encoded 8-pixel tile row
-STRIP_PRIO = bytes(i & 0x1F for i in range(256))
-WHITE_RGB = b"\xff" * (WIDTH * HEIGHT * 3)
 
 
 def _attr_table(a: int) -> bytes:
