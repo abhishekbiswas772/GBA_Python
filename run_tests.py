@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 
-from tests.helpers import REAL_HARDWARE_HZ, run_serial
+from tests.helpers import CYCLE_BUDGET, REAL_HARDWARE_HZ, run_serial
 
 ROOT = Path(__file__).parent
 
@@ -19,7 +19,7 @@ ROMS = [
     (Path("tests/roms/cpu_instrs/10-bit ops.gb"), None),
     (Path("tests/roms/cpu_instrs/11-op a,(hl).gb"), None),
     (Path("tests/roms/other/instr_timing.gb"), None),
-    (Path("tests/roms/other/cpu_instrs.gb"), "needs MBC1 (phase 7)"),
+    (Path("tests/roms/other/cpu_instrs.gb"), None),
     (Path("tests/roms/other/dmg-acid2.gb"), "no serial output - tested via pytest --slow"),
 ]
 
@@ -35,7 +35,8 @@ def main() -> int:
             print(f"SKIP  {name:<42} {skip}")
             skipped += 1
             continue
-        text, cycles, wall, done = run_serial(ROOT / rel)
+        text, cycles, wall, done = run_serial(ROOT / rel,
+                                              budget=CYCLE_BUDGET * (3 if rel.name == "cpu_instrs.gb" else 1))
         total_cycles += cycles
         total_wall += wall
         if not done:

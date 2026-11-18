@@ -22,27 +22,31 @@ def main() -> None:
     print(gb.cart)
     t0 = time.time()
 
-    window = not (args.headless or args.doctor or args.steps)
-    if window:
-        from src.gameboy.display import Display, joypad_key_handler
-        title = args.rom.replace("\\", "/").rsplit("/", 1)[-1]
-        disp = Display(gb, scale=args.scale, title=title)
-        disp.on_key = joypad_key_handler(gb.joypad)
-        try:
-            disp.run()
-        except KeyboardInterrupt:
-            print("\n[Stopped by user]")
-        steps = None
-    else:
-        log = open(args.doctor, "w") if args.doctor else None
-        try:
-            steps = gb.run(max_steps=args.steps, doctor_log=log)
-        except KeyboardInterrupt:
+    try:
+        window = not (args.headless or args.doctor or args.steps)
+        if window:
+            from src.gameboy.display import Display, joypad_key_handler
+            title = args.rom.replace("\\", "/").rsplit("/", 1)[-1]
+            disp = Display(gb, scale=args.scale, title=title)
+            disp.on_key = joypad_key_handler(gb.joypad)
+            try:
+                disp.run()
+            except KeyboardInterrupt:
+                print("\n[Stopped by user]")
             steps = None
-            print("\n[Stopped by user]")
-        finally:
-            if log:
-                log.close()
+        else:
+            log = open(args.doctor, "w") if args.doctor else None
+            try:
+                steps = gb.run(max_steps=args.steps, doctor_log=log)
+            except KeyboardInterrupt:
+                steps = None
+                print("\n[Stopped by user]")
+            finally:
+                if log:
+                    log.close()
+    finally:
+        if gb.save():
+            print(f"[saved battery RAM -> {gb.cart.sav_path.name}]")
 
     secs = time.time() - t0
     if steps:

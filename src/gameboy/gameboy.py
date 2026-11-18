@@ -18,6 +18,10 @@ class GameBoy:
         self.mmu.ppu = self.ppu
         self.cpu = CPU(self.mmu)
         self.total_cycles = 0
+        self._frames_since_save = 0
+
+    def save(self) -> bool:
+        return self.cart.save_ram()
 
     def steps(self) -> int:
         cycles = self.cpu.step()
@@ -31,6 +35,10 @@ class GameBoy:
         while self.ppu.frame_count < target:
             self.steps()
         self.ppu.frame_ready = False
+        self._frames_since_save += 1
+        if self._frames_since_save >= 600:      # autosave dirty battery RAM ~10s
+            self._frames_since_save = 0
+            self.cart.save_ram()
 
 
     def run(self, max_steps = None, doctor_log = None, stop_on_serial = ("Passed", "Failed")):
