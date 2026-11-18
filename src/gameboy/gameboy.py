@@ -1,3 +1,4 @@
+from src.gameboy.apu import APU
 from src.gameboy.cartridge import Cartridge
 from src.gameboy.cpu import CPU
 from src.gameboy.joypad import Joypad
@@ -16,6 +17,9 @@ class GameBoy:
         self.mmu.joypad = self.joypad
         self.ppu = PPU(self.mmu)
         self.mmu.ppu = self.ppu
+        self.apu = APU()
+        self.apu.post_boot()                    # no boot ROM: start in post-boot state
+        self.mmu.apu = self.apu
         self.cpu = CPU(self.mmu)
         self.total_cycles = 0
         self._frames_since_save = 0
@@ -27,6 +31,7 @@ class GameBoy:
         cycles = self.cpu.step()
         self.timer.tick(cycles)
         self.ppu.step(cycles)
+        self.apu.step(cycles)
         self.total_cycles += cycles
         return cycles
 

@@ -1,5 +1,12 @@
 from src.gameboy.cartridge import Cartridge
 
+# DMG IO read-back: bits OR'd in on read. 0xFF = unmapped (always reads 0xFF).
+# Registers owned by joypad/timer/APU/PPU apply their own masks.
+_IO_OR = bytearray([0xFF] * 0x80)
+_IO_OR[0x01] = 0x00      # SB
+_IO_OR[0x02] = 0x7E      # SC: only bits 7 and 0 exist
+_IO_OR[0x0F] = 0xE0      # IF: upper 3 bits read as 1
+
 
 class MMU:
     def __init__(self, cartridge: Cartridge):
@@ -13,6 +20,7 @@ class MMU:
         self.timer = None
         self.ppu = None
         self.joypad = None
+        self.apu = None
 
         self.serial_output = []
 
@@ -84,15 +92,21 @@ class MMU:
     def read_io(self, addr: int) -> int:
         if addr == 0xFF00 and self.joypad is not None:
             return self.joypad.read()
+        if 0xFF10 <= addr <= 0xFF3F and self.apu is not None:
+            return self.apu.read(addr)
         if 0xFF04 <= addr <= 0xFF07 and self.timer is not None:
             return self.timer.read(addr)
         if 0xFF40 <= addr <= 0xFF4B and self.ppu is not None:
             return self.ppu.read(addr)
-        return self.io[addr - 0xFF00]
+        i = addr - 0xFF00
+        return self.io[i] | _IO_OR[i]
 
     def write_io(self, addr: int, value: int) -> None:
         if addr == 0xFF00 and self.joypad is not None:
             self.joypad.write(value)
+            return
+        if 0xFF10 <= addr <= 0xFF3F and self.apu is not None:
+            self.apu.write(addr, value)
             return
         if 0xFF04 <= addr <= 0xFF07 and self.timer is not None:
             self.timer.write(addr, value)
@@ -100,10 +114,17 @@ class MMU:
         if 0xFF40 <= addr <= 0xFF4B and self.ppu is not None:
             self.ppu.write(addr, value)
             return
-        self.io[addr - 0xFF00] = value 
-        if addr == 0xFF02 and value == 0x81:
-            self.serial_output.append(chr(self.io[0x01]))
-            self.io[0x02] = 0x01
+        if addr == 0xFF0F:
+            value &= 0x1F
+        self.io[addr - 0xFF00] = value
+        if addr == 0xFF02 and value & 0x81 == 0x81:
+            # Internal-clock transfer with no link partner: completes at once,
+            # shifting in 1s (SB=0xFF), clearing SC bit 7 and raising the serial IRQ.
+            if len(self.serial_output) < 65536:
+                self.serial_output.append(chr(self.io[0x01]))
+            self.io[0x01] = 0xFF
+            self.io[0x02] = value & 0x7F
+            self.request_interrupt(0x08)
 
     def dma_transfer(self, src: int) -> None:
         oam = self.oam
@@ -117,12 +138,8 @@ class MMU:
                 v = self.cart.read(a)
             elif a < 0xE000:
                 v = self.wram[a - 0xC000]
-            elif a < 0xFE00:
-                v = self.wram[a - 0xE000]
-            elif a < 0xFEA0:
-                v = self.oam[a - 0xFE00]
-            else:
-                v = 0xFF
+            else:                        # E000-FFFF: DMA source mirrors WRAM
+                v = self.wram[(a - 0xE000) & 0x1FFF]
             oam[i] = v
     
     def serial_text(self) -> str:

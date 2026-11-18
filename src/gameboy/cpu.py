@@ -213,8 +213,9 @@ class CPU:
                         return 20
                     return ld_a16_sp
                 if y == 2:
-                    def stop():                                        
+                    def stop():
                         self.fetch8()
+                        self.mmu.write(0xFF04, 0)              # STOP resets DIV
                         return 4
                     return stop
                 if y == 3:

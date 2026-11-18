@@ -17,4 +17,11 @@ src/rom/
 
 # Test run artifacts (keep only *-reference.png)
 tests/roms/other/*-actual.png
+tests/roms/other/*-actual.wav
 tests/roms/other/window-screenshot.png
+*.sav.tmp
+
+# Tool caches / profiling dumps
+.pytest_cache/
+prof
+*.prof

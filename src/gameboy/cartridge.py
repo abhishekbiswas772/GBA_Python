@@ -14,6 +14,7 @@ except day-high itself; day carry is bit 7.
 """
 from __future__ import annotations
 
+import os
 import struct
 import time
 from dataclasses import dataclass
@@ -103,9 +104,10 @@ class RTC:
         return self.latch[reg]
 
     def write(self, reg: int, value: int) -> bool:
+        # Writable at any time on real MBC3 (games are told to halt first, not forced to).
         self.advance()
-        if reg < 4 and not (self.regs[4] & 0x40):
-            return False               # writable only while halted
+        if reg == 0:
+            self.last = time.time()    # writing seconds resets the sub-second phase
         value &= self.MASKS[reg]
         changed = self.regs[reg] != value
         self.regs[reg] = value
@@ -121,9 +123,10 @@ class RTC:
                 + struct.pack("<Q", int(self.last)))
 
     def from_bytes(self, data: bytes) -> None:
+        """Load the VBA/BGB RTC footer: 48 bytes (64-bit timestamp) or 44 (32-bit)."""
         cur = struct.unpack("<5I", data[:20])
         lat = struct.unpack("<5I", data[20:40])
-        (ts,) = struct.unpack("<Q", data[40:48])
+        (ts,) = struct.unpack("<Q", data[40:48]) if len(data) >= 48 else struct.unpack("<I", data[40:44])
         self.regs = [cur[i] & self.MASKS[i] for i in range(5)]
         self.latch = [lat[i] & self.MASKS[i] for i in range(5)]
         self.last = float(ts)
@@ -188,11 +191,15 @@ class Cartridge:
         if not (self.ram_dirty or force):
             return False
         extra = self.rtc.to_bytes() if self.rtc is not None else b""
-        self.sav_path.write_bytes(bytes(self.ram) + extra)
+        tmp = self.sav_path.with_name(self.sav_path.name + ".tmp")
+        try:                           # atomic: a crash mid-write never truncates the .sav
+            tmp.write_bytes(bytes(self.ram) + extra)
+            os.replace(tmp, self.sav_path)
+        except OSError as e:
+            print(f"[warning: could not write {self.sav_path.name}: {e}]")
+            return False
         self.ram_dirty = False
         return True
-
-    save = save_ram
 
     def _load_save(self) -> None:
         if not (self.has_battery and self.sav_path and self.sav_path.exists()):
@@ -200,8 +207,8 @@ class Cartridge:
         data = self.sav_path.read_bytes()
         n = min(len(self.ram), len(data))
         self.ram[:n] = data[:n]
-        if self.rtc is not None and len(data) >= n + 48:
-            self.rtc.from_bytes(data[n:n + 48])
+        if self.rtc is not None and len(data) - n in (44, 48):
+            self.rtc.from_bytes(data[n:])
 
     def __repr__(self) -> str:
         h = self.header
@@ -387,7 +394,8 @@ class MBC5(MBC):
             self.romx_base = (self.rom_bank % self.header.rom_banks) * 0x4000
         elif addr < 0x6000:
             ram_banks = max(len(self.ram) // 0x2000, 1)
-            self.ram_base = ((value & 0x0F) % ram_banks) * 0x2000    # rumble bit ignored
+            mask = 0x07 if self.header.cart_type in (0x1C, 0x1D, 0x1E) else 0x0F  # bit 3 = rumble motor
+            self.ram_base = ((value & mask) % ram_banks) * 0x2000
         elif addr < 0x8000:
             pass
         elif 0xA000 <= addr < 0xC000:

@@ -2,9 +2,10 @@
 import sys
 from pathlib import Path
 
-from tests.helpers import CYCLE_BUDGET, REAL_HARDWARE_HZ, run_serial
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))          # allow `python tests/run_tests.py` as well as `-m`
 
-ROOT = Path(__file__).parent
+from tests.helpers import CYCLE_BUDGET, REAL_HARDWARE_HZ, run_serial
 
 ROMS = [
     (Path("tests/roms/cpu_instrs/01-special.gb"), None),

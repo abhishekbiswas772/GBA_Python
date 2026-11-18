@@ -3,24 +3,26 @@ from src.gameboy.disasm import disassemble, disassemble_range
 
 
 class Debugger:
+    HELP = ("commands: s [n] step | c continue | b <hex> breakpoint | d [hex] disasm | "
+            "m <hex> [len] memory | r regs | h history | serial | q quit")
+
     def __init__(self, gb, history_size: int = 32):
         self.gb = gb
         self.cpu = gb.cpu
         self.mmu = gb.mmu
-        self.history = deque(maxlen=history_size)   
+        self.history = deque(maxlen=history_size)
         self.breakpoints: set[int] = set()
 
 
     def step(self) -> None:
-        cpu = self.cpu
-        self.history.append((cpu.pc, cpu.doctor_line()))
-        self.gb.step()
+        self.history.append(self.cpu.pc)
+        self.gb.steps()
 
     def run(self, max_steps: int = 50_000_000) -> str:
         for _ in range(max_steps):
             try:
                 self.step()
-            except Exception as exc:                         
+            except Exception as exc:
                 return f"CRASH: {exc}"
             if self.cpu.pc in self.breakpoints:
                 return f"breakpoint at 0x{self.cpu.pc:04X}"
@@ -47,7 +49,7 @@ class Debugger:
 
     def show_history(self) -> str:
         lines = []
-        for pc, _ in self.history:
+        for pc in self.history:
             text, _ = disassemble(self.mmu, pc)
             lines.append(f"  0x{pc:04X}: {text}")
         return "\n".join(lines)

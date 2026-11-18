@@ -164,3 +164,50 @@ def test_timer_overflow_triggers_dispatch():
     assert mmu.io[0x0F] & 0x04
     assert cpu.step() == 20
     assert cpu.pc == 0x50
+
+
+def test_io_read_masks():
+    from src.gameboy.cartridge import Cartridge
+    from src.gameboy.mmu import MMU
+    from tests.helpers import blank_rom
+    mmu = MMU(Cartridge(bytes(blank_rom())))
+    mmu.write(0xFF0F, 0x00)
+    assert mmu.read(0xFF0F) == 0xE0      # IF upper bits read 1
+    mmu.write(0xFF02, 0x00)
+    assert mmu.read(0xFF02) == 0x7E
+    for addr in (0xFF03, 0xFF4D, 0xFF50, 0xFF7F):
+        mmu.write(addr, 0x12)
+        assert mmu.read(addr) == 0xFF    # unmapped
+
+
+def test_serial_transfer_completes_without_partner():
+    from src.gameboy.cartridge import Cartridge
+    from src.gameboy.mmu import MMU
+    from tests.helpers import blank_rom
+    mmu = MMU(Cartridge(bytes(blank_rom())))
+    mmu.write(0xFF01, ord("A"))
+    mmu.write(0xFF02, 0x81)
+    assert mmu.serial_text() == "A"
+    assert mmu.read(0xFF01) == 0xFF
+    assert mmu.read(0xFF02) & 0x80 == 0
+    assert mmu.io[0x0F] & 0x08
+
+
+def test_debugger_steps_and_breaks():
+    from src.gameboy.debugger import Debugger
+
+    class _GB:                           # minimal GameBoy facade
+        def __init__(self):
+            self.cpu, self.mmu, self.timer = build(make_rom(b"\x00\x00\x00\x18\xFE"))
+
+        def steps(self):
+            c = self.cpu.step()
+            self.timer.tick(c)
+            return c
+
+    dbg = Debugger(_GB())
+    dbg.breakpoints.add(0x153)
+    assert dbg.run(100) == "breakpoint at 0x0153"
+    assert list(dbg.history) == [0x150, 0x151, 0x152]
+    assert "0x0150" in dbg.show_history()
+    assert "commands" in Debugger.HELP

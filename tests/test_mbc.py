@@ -3,6 +3,7 @@ import os
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 
+import shutil
 import time
 from pathlib import Path
 
@@ -188,8 +189,8 @@ def test_mbc3_rtc_latch():
 def test_mbc3_rtc_halt_and_writes():
     cart = mbc3_rtc()
     rtc_select(cart, 0x08)
-    cart.write(0xA000, 30)                   # running: ignored
-    assert cart.rtc.regs[0] == 0
+    cart.write(0xA000, 25)                   # running: still writable (real MBC3)
+    assert cart.rtc.regs[0] == 25
     set_halt(cart)
     rtc_select(cart, 0x08)
     cart.write(0xA000, 30)
@@ -252,13 +253,13 @@ POKEMON_PNG = Path(__file__).parent / "roms" / "other" / "pokemon-title-actual.p
 
 
 @pytest.mark.slow
-def test_pokemon_red_title_and_battery_save():
+def test_pokemon_red_title_and_battery_save(tmp_path):
     if not POKEMON_ROM.exists():
         pytest.skip("commercial ROM not present")
-    sav = POKEMON_ROM.with_suffix(".sav")
-    if sav.exists():
-        sav.unlink()                       # start from clean SRAM
-    gb = GameBoy(POKEMON_ROM)
+    rom = tmp_path / "pokemon.gb"          # private copy: the user's real .sav is
+    shutil.copyfile(POKEMON_ROM, rom)      # never read, deleted or overwritten
+    sav = rom.with_suffix(".sav")
+    gb = GameBoy(rom)
     for _ in range(1500):                  # ~25s of Game Boy time: intro -> title
         gb.run_frame()
     pygame.image.save(framebuffer_surface(gb.ppu.framebuffer, palette=GRAY_PALETTE),
@@ -267,7 +268,7 @@ def test_pokemon_red_title_and_battery_save():
     assert sum(1 for b in gb.cart.ram if b) > 0
     assert gb.cart.save_ram(force=True) is True
     assert sav.exists()
-    cart2 = Cartridge.from_file(POKEMON_ROM)   # fresh cart loads the .sav
+    cart2 = Cartridge.from_file(rom)           # fresh cart loads the .sav
     assert bytes(cart2.ram) == bytes(gb.cart.ram)
 
 
@@ -389,3 +390,32 @@ def test_sav_without_rtc_footer(tmp_path):
     cart = Cartridge.from_file(rom_path)
     assert cart.ram[0] == 0 and cart.ram[1] == 1
     assert cart.rtc.regs == [0] * 5
+
+
+def test_mbc5_rumble_bit_not_a_ram_bank():
+    cart = Cartridge(make_cart_rom(0x1E, banks=8, ram_kb=128))
+    cart.write(0x0000, 0x0A)
+    cart.write(0x4000, 0x09)                 # rumble on + bank 1
+    assert cart.ram_base == 1 * 0x2000
+
+
+def test_rtc_44_byte_footer_loads(tmp_path):
+    import struct
+    rom_path = tmp_path / "rtc.gb"
+    rom_path.write_bytes(make_cart_rom(0x10, banks=16, ram_kb=32))
+    regs = [5, 6, 7, 8, 0]
+    footer = struct.pack("<5I", *regs) + struct.pack("<5I", *regs) + struct.pack("<I", int(time.time()))
+    rom_path.with_suffix(".sav").write_bytes(bytes(32 * 1024) + footer)
+    cart = Cartridge.from_file(rom_path)
+    assert cart.rtc.regs[1:4] == [6, 7, 8]
+
+
+def test_save_is_atomic_and_leaves_no_tmp(tmp_path):
+    rom_path = tmp_path / "bat.gb"
+    rom_path.write_bytes(make_cart_rom(0x03, banks=4, ram_kb=8))
+    cart = Cartridge.from_file(rom_path)
+    cart.write(0x0000, 0x0A)
+    cart.write(0xA000, 0x42)
+    assert cart.save_ram()
+    assert rom_path.with_suffix(".sav").read_bytes()[0] == 0x42
+    assert not list(tmp_path.glob("*.tmp"))

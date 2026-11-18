@@ -1,6 +1,7 @@
 WIDTH = 160
 HEIGHT = 144
 LINE_DOTS = 456
+FRAME_DOTS = LINE_DOTS * 154
 
 _PAIRS: list = [None] * 65536
 _SHIFTS = (7, 6, 5, 4, 3, 2, 1, 0)
@@ -57,6 +58,7 @@ class PPU:
         self.vram_locked = False
         self.oam_locked = False
         self._stat_line = False
+        self._off_cycles = 0
 
         self._bgp_tr = _palette_table(self.bgp)
         self._obp0_t = _palette4(self.obp0)
@@ -80,8 +82,26 @@ class PPU:
 
     def write(self, addr: int, value: int) -> None:
         if addr == 0xFF40:
+            was_on = self.lcdc & 0x80
             self.lcdc = value
-            self._set_mode(self.mode)
+            if was_on and not value & 0x80:
+                # LCD off: LY=0, mode 0, no PPU interrupts, screen blank (white)
+                self.ly = 0
+                self.line_cycles = 0
+                self.win_y = 0
+                self.win_active = False
+                self._off_cycles = 0
+                self.framebuffer[:] = bytes(WIDTH * HEIGHT)
+                self.mode = 0
+                self.vram_locked = self.oam_locked = False
+                self._stat_line = False
+            elif not was_on and value & 0x80:
+                # LCD on: frame restarts at LY=0, dot 0
+                self.ly = 0
+                self.line_cycles = 0
+                self._set_mode(2)
+            else:
+                self._set_mode(self.mode)
         elif addr == 0xFF41:
             self.stat_en = value & 0x78
             self._update_stat()
@@ -112,6 +132,14 @@ class PPU:
             self.wx = value
 
     def step(self, cycles: int) -> None:
+        if not self.lcdc & 0x80:
+            # Off: LY frozen, no IRQs; keep a frame tick so run_frame() still returns
+            self._off_cycles += cycles
+            while self._off_cycles >= FRAME_DOTS:
+                self._off_cycles -= FRAME_DOTS
+                self.frame_count += 1
+                self.frame_ready = True
+            return
         while cycles > 0:
             if self.ly >= 144:
                 nxt = LINE_DOTS

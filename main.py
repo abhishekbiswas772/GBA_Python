@@ -16,6 +16,7 @@ def main() -> None:
     ap.add_argument("--steps", default=None, type=int, help="max instruction to run")
     ap.add_argument("--headless", action="store_true", help="run without a window")
     ap.add_argument("--scale", default=3, type=int, help="window scale factor")
+    ap.add_argument("--mute", action="store_true", help="disable audio output")
     args = ap.parse_args()
 
     gb = GameBoy(args.rom)
@@ -23,11 +24,11 @@ def main() -> None:
     t0 = time.time()
 
     try:
-        window = not (args.headless or args.doctor or args.steps)
+        window = not (args.headless or args.doctor or args.steps is not None)
         if window:
             from src.gameboy.display import Display, joypad_key_handler
             title = args.rom.replace("\\", "/").rsplit("/", 1)[-1]
-            disp = Display(gb, scale=args.scale, title=title)
+            disp = Display(gb, scale=args.scale, title=title, mute=args.mute)
             disp.on_key = joypad_key_handler(gb.joypad)
             try:
                 disp.run()
@@ -49,7 +50,7 @@ def main() -> None:
             print(f"[saved battery RAM -> {gb.cart.sav_path.name}]")
 
     secs = time.time() - t0
-    if steps:
+    if steps is not None:
         emulated_secs = gb.total_cycles / 4_194_304  
         print(f"\n\n{steps:,} instructions, {gb.total_cycles:,} T-cycles in {secs:.1f}s")
         speed = emulated_secs / max(secs, 1e-9) * 100

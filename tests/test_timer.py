@@ -108,3 +108,26 @@ def test_mmu_io_delegation():
     assert mmu.io[0x0F] & 0x04
     mmu.write(0xFF04, 0xFF)
     assert mmu.read(0xFF04) == 0
+
+
+def test_div_write_falling_edge_ticks_tima():
+    timer, _ = make_timer()
+    timer.write(0xFF07, 0x05)            # enabled, bit 3 (16 cycles)
+    timer.tick(8)                        # bit 3 now high
+    timer.write(0xFF04, 0)               # reset DIV -> bit falls -> TIMA+1
+    assert timer.tima == 1
+
+
+def test_tac_disable_glitch_ticks_tima():
+    timer, _ = make_timer()
+    timer.write(0xFF07, 0x05)
+    timer.tick(8)
+    timer.write(0xFF07, 0x01)            # disable while selected bit high
+    assert timer.tima == 1
+
+
+def test_stop_resets_div():
+    cpu, mmu, timer = build(make_rom(b"\x10\x00"))
+    timer.tick(0x1234)
+    cpu.step()
+    assert timer.read(0xFF04) == 0

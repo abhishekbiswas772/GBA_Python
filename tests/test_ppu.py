@@ -447,3 +447,18 @@ def test_lcd_off_blank_keeps_counting():
     ppu.step(456 * 154)
     assert ppu.frame_count == fc + 1        # still counts frames
     assert ppu.framebuffer == bytes(W * 144)
+
+
+def test_lcd_off_freezes_ly_and_suppresses_irqs():
+    mmu, ppu = build_ppu()
+    mmu.write(0xFF40, 0x91)
+    ppu.step(456 * 50)
+    mmu.write(0xFF41, 0x78)                  # all STAT sources enabled
+    mmu.write(0xFF40, 0x11)                  # LCD off
+    mmu.io[0x0F] = 0
+    ppu.step(456 * 154 * 2)
+    assert ppu.ly == 0
+    assert mmu.read(0xFF41) & 0x03 == 0      # mode 0
+    assert mmu.io[0x0F] & 0x03 == 0          # no VBlank / STAT
+    mmu.write(0xFF40, 0x91)                  # back on: restarts at LY 0
+    assert ppu.ly == 0 and ppu.line_cycles == 0

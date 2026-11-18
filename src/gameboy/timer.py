@@ -9,6 +9,17 @@ class Timer:
         self.tma = 0
         self.tac = 0
 
+    def _signal(self) -> bool:
+        """The AND of TAC enable and the selected DIV bit; TIMA ticks on its falling edge."""
+        return bool(self.tac & 0x04 and self.div & (1 << _FREQ_BITS[self.tac & 3]))
+
+    def _inc_tima(self) -> None:
+        if self.tima == 0xFF:
+            self.tima = self.tma
+            self.mmu.request_interrupt(0x04)
+        else:
+            self.tima += 1
+
     def tick(self, cycles: int) -> None:
         old = self.div
         self.div = (old + cycles) & 0xFFFF
@@ -34,10 +45,15 @@ class Timer:
 
     def write(self, addr: int, value: int) -> None:
         if addr == 0xFF04:
+            if self._signal():          # resetting DIV can make the selected bit fall
+                self._inc_tima()
             self.div = 0
         elif addr == 0xFF05:
             self.tima = value & 0xFF
         elif addr == 0xFF06:
             self.tma = value & 0xFF
         else:
+            was = self._signal()
             self.tac = value & 0x07
+            if was and not self._signal():   # DMG TAC-write glitch
+                self._inc_tima()
