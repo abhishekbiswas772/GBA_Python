@@ -25,11 +25,11 @@ class MMU:
         if addr < 0xE000:
             return self.wram[addr - 0xC000]
         if addr < 0xFE00:
-            return self.wram[addr - 0xE000]          # echo RAM
+            return self.wram[addr - 0xE000]          
         if addr < 0xFEA0:
             return self.oam[addr - 0xFE00]
         if addr < 0xFF00:
-            return 0xFF                              # unusable area
+            return 0xFF                              
         if addr < 0xFF80:
             return self.read_io(addr)
         if addr < 0xFFFF:
@@ -40,7 +40,7 @@ class MMU:
         addr &= 0xFFFF
         value &= 0xFF
         if addr < 0x8000:
-            self.cart.write(addr, value)             # MBC commands (Phase 7)
+            self.cart.write(addr, value)             
         elif addr < 0xA000:
             self.vram[addr - 0x8000] = value
         elif addr < 0xC000:
@@ -48,11 +48,11 @@ class MMU:
         elif addr < 0xE000:
             self.wram[addr - 0xC000] = value
         elif addr < 0xFE00:
-            self.wram[addr - 0xE000] = value         # echo RAM
+            self.wram[addr - 0xE000] = value         
         elif addr < 0xFEA0:
             self.oam[addr - 0xFE00] = value
         elif addr < 0xFF00:
-            pass                                     # unusable area
+            pass                                     
         elif addr < 0xFF80:
             self.write_io(addr, value)
         elif addr < 0xFFFF:
@@ -70,6 +70,8 @@ class MMU:
         self.write(addr + 1, (value >> 8) & 0xFF)
 
     def read_io(self, addr: int) -> int:
+        if addr == 0xFF44:
+            return 0x90
         return self.io[addr - 0xFF00]
 
     def write_io(self, addr: int, value: int) -> None:

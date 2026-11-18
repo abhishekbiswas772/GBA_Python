@@ -45,3 +45,18 @@ RAM_SIZES = {
     0x04: 128,
     0x05: 64
 }
+
+
+FLAG_Z = 0x80   
+FLAG_N = 0x40   
+FLAG_H = 0x20   
+FLAG_C = 0x10   
+
+R8 = ["b", "c", "d", "e", "h", "l", "(hl)", "a"]
+R16 = ["bc", "de", "hl", "sp"]          
+R16_STACK = ["bc", "de", "hl", "af"]   
+CONDITIONS = ["nz", "z", "nc", "c"]     
+
+
+def signed8(value: int) -> int:
+    return (value ^ 0x80) - 0x80
