@@ -68,7 +68,7 @@
 - **Save states, on every core.** Four slots per game plus a resume point. Leaving a game pauses it and offers to save first. States from this session load instantly.
 - **Rewind.** Hold `R` to go back up to 30 seconds.
 - **Recording and instant replay.**
-  - Record gameplay as a GIF.
+  - Record gameplay as **MP4 with sound** (H.264 + AAC), or as a GIF.
   - "Clip last 30s" saves what just happened, without having to be recording.
   - Both land in **Moments**, next to your screenshots.
 
@@ -170,7 +170,7 @@ Prebuilt **Windows** and **Linux** apps are attached to every [release](https://
 
 ### Moments
 
-Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest first. Filter by **Recordings & clips** or **Screenshots**. GIFs play in the preview. For a selected moment you can **Export** it, **Copy to clipboard**, **Show in folder** or **Delete** it.
+Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest first. Filter by **Recordings & clips** or **Screenshots**. GIFs play in the preview, and videos show a poster frame. For a selected moment you can **Export** it, **Play** it (videos) or **Copy to clipboard** (images), **Show in folder** or **Delete** it.
 
 ### Settings
 
@@ -208,9 +208,8 @@ Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest fi
 | Rewind (30 s) | ✅ |
 | Fast-forward (2×, 4×, 8×, hold `F`) | ✅ |
 | Screenshots | ✅ |
-| GIF recording, clip of the last 30 s | ✅ (silent GIFs) |
+| Recording and clip of the last 30 s, as MP4 with sound or GIF | ✅ |
 | Cheats, achievements, link play | 🚧 UI preview, not in the cores yet |
-| MP4 / WebM export with sound | 🚧 not yet |
 
 ---
 
@@ -301,7 +300,7 @@ saves/nes/My Game/
 | **Safe loading** | States load with a restricted unpickler that only allows the emulator's own classes, so a shared `.state` file can't run code. A state from another game or console is refused. |
 | **Leaving a game** | The game pauses and asks: **Save and leave**, **Leave without saving**, or **Cancel**. **Continue playing** in the library then offers **Load resume point**. |
 | **Rewind** | A snapshot is taken every 6 frames and kept for 30 s, compressed in memory. Holding rewind walks back about 3× faster than real time, with the sound muted. |
-| **Recording** | Frames are compressed as they arrive, at 30 fps, and the GIF is encoded on a background thread when you stop. GIFs have no sound. |
+| **Recording** | Picture (30 fps) and game sound are compressed as they arrive, both tagged with game time, so they stay in sync even with frameskip or fast-forward. When you stop, a background thread encodes an **MP4** (H.264 + AAC, scaled up to about 720 lines with sharp pixels) or a silent **GIF**. Pick the format under **Record as** in the player. MP4 encoding uses PyAV, whose wheels include FFmpeg, so there is nothing else to install. |
 | **Clip last 30s** | A rolling 30 s replay buffer (can be turned off in the player). Saving a clip never interrupts the game. |
 
 ```mermaid
@@ -410,7 +409,7 @@ src/core/adaptors/snapshot/  save-state hooks the cores implement
 src/bridge/              Machine API, EmulatorRunner, keyboard / gamepad / touch adaptors
 src/bridge/savestate/    save states: in-memory snapshots, state files, slots
 src/bridge/rewind/       rewind ring buffer
-src/bridge/recorder/     GIF recording and the 30 s replay buffer
+src/bridge/recorder/     MP4 (with sound) / GIF recording and the 30 s replay buffer
 src/ui/                  Flet app (library, player, settings, themes)
 tests/roms/              open test ROMs: blargg, Acid2, jsmolka, nes-test-roms
 docs/                    README media and make_media.py
@@ -459,7 +458,6 @@ Push a tag like `v0.2.0` and GitHub Actions builds both apps and publishes them 
 ## 🧭 Honest limits
 
 - Cheats, achievements and link play are UI previews for now; the cores don't implement them yet.
-- Recordings and clips are silent GIFs. There is no MP4 export with sound yet.
 - Sound uses SDL through pygame, so it works in the desktop app only.
 - The NES core is NTSC only. PAL and mappers beyond the ones listed above are welcome contributions.
 

@@ -1,4 +1,4 @@
-"""Moments: gallery of screenshots and GIF recordings / clips, with export and copy."""
+"""Moments: gallery of screenshots and recordings / clips (MP4 with sound, or GIF)."""
 from __future__ import annotations
 
 import shutil
@@ -8,19 +8,27 @@ from typing import TYPE_CHECKING
 import flet as ft
 
 from src.ui import components as c
-from src.ui.data.moments import list_moments, moments_dir
+from src.ui.data.moments import list_moments, moments_dir, poster_for
 
 if TYPE_CHECKING:
     from src.ui.app import App
 
-FILTERS = [("all", "All"), ("GIF", "Recordings & clips"), ("SHOT", "Screenshots")]
-VISUAL = ("SHOT", "GIF")                 # kinds the image widget can show (GIFs animate)
+FILTERS = [("all", "All"), ("video", "Recordings & clips"), ("SHOT", "Screenshots")]
+VIDEO = ("CLIP", "GIF")
+
+
+def _matches(m, f: str) -> bool:
+    if f == "all":
+        return True
+    if f in ("video", "GIF", "CLIP"):
+        return m.kind in VIDEO
+    return m.kind == f
 
 
 def build(app: "App") -> ft.Control:
     t, ui, wide = app.t, app.ui, app.wide
     everything = list_moments()
-    items = [m for m in everything if ui.moments_filter == "all" or m.kind == ui.moments_filter]
+    items = [m for m in everything if _matches(m, ui.moments_filter)]
     sel = next((m for m in everything if m.path == ui.moments_sel), None) or (items[0] if items else None)
 
     def pick(path: str) -> None:
@@ -45,7 +53,7 @@ def build(app: "App") -> ft.Control:
         for m in items:
             on = sel is not None and m.path == sel.path
             thumb = ft.Stack([
-                c.screen_placeholder(t, width=thumb_w, aspect=3 / 2, radius=8, image=m.path if m.kind in VISUAL else None),
+                c.screen_placeholder(t, width=thumb_w, aspect=3 / 2, radius=8, image=m.image),
                 ft.Container(c.mono(m.kind, size=10, weight=500, color="#FFFFFF"), left=8, top=8,
                              bgcolor=c.alpha("#000000", 0.72), border_radius=4, padding=c.pad(6, 2)),
                 ft.Container(c.mono(m.length, size=11, color="#FFFFFF"), right=8, bottom=8,
@@ -63,7 +71,7 @@ def build(app: "App") -> ft.Control:
     else:
         gallery = c.empty_state(
             t, "No moments yet" if not everything else "Nothing in this filter",
-            f"While playing: {app.settings.hotkeys['screenshot']} takes a screenshot, Record makes a GIF, "
+            f"While playing: {app.settings.hotkeys['screenshot']} takes a screenshot, Record makes a video with sound, "
             "and Clip last 30s saves what just happened.", icon_name=ft.Icons.PHOTO_CAMERA_OUTLINED)
 
     main = ft.Container(ft.Column([gallery], scroll=ft.ScrollMode.AUTO if wide else None, expand=wide),
@@ -103,6 +111,7 @@ def _editor(app: "App", sel) -> list[ft.Control]:
     def delete(e) -> None:
         try:
             src.unlink()
+            poster_for(src).unlink(missing_ok=True)
         except OSError as err:
             app.toast(f"Couldn't delete: {err}")
             return
@@ -111,17 +120,20 @@ def _editor(app: "App", sel) -> list[ft.Control]:
 
     panel_w = 352 if app.wide else app.width - 48
     preview = c.screen_placeholder(t, f"Preview · {sel.length}", width=panel_w, aspect=3 / 2, radius=4,
-                                   image=sel.path if sel.kind in VISUAL else None)
+                                   image=sel.image)
     try:
         size_kb = src.stat().st_size / 1024
     except OSError:
         size_kb = 0
     facts = ft.Row([c.mono(ext.upper(), t), c.mono(f"{size_kb:,.0f} KB", t),
-                    c.mono("animated, no sound" if sel.kind == "GIF" else "still image", t)],
+                    c.mono({"GIF": "animated, no sound", "CLIP": "H.264 + AAC sound"}.get(sel.kind, "still image"),
+                           t)],
                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
     share = ft.Column([
         c.eyebrow("Share", t, size=12),
-        ft.Row([c.button("Copy to clipboard", copy_image, t, icon_name=ft.Icons.CONTENT_COPY, expand=1, h_pad=8),
+        ft.Row([c.button("Play", lambda e: app.open_folder(src), t, icon_name=ft.Icons.PLAY_ARROW, expand=1,
+                         h_pad=8) if sel.kind == "CLIP" else
+                c.button("Copy to clipboard", copy_image, t, icon_name=ft.Icons.CONTENT_COPY, expand=1, h_pad=8),
                 c.button("Show in folder", lambda e: app.open_folder(src.parent), t,
                          icon_name=ft.Icons.FOLDER_OPEN, expand=1, h_pad=8)], spacing=8),
         c.button("Delete", delete, t, variant="ghost", icon_name=ft.Icons.DELETE_OUTLINE),

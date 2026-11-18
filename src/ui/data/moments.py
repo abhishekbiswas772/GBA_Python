@@ -1,8 +1,9 @@
-"""Moments: screenshots, GIF recordings and clips saved from the player.
+"""Moments: screenshots, recordings and clips (MP4 with sound, or GIF) from the player.
 
 Files live in <data dir>/moments. The file name carries the game and system so the
 gallery can show "Title · GB · 2 h ago" without a database:
-    <title>__<SYSTEM>__<unix time>.png
+    <title>__<SYSTEM>__<unix time>.png | .gif | .mp4
+Videos get a poster frame in .posters/<stem>.png for the gallery.
 """
 from __future__ import annotations
 
@@ -38,7 +39,20 @@ class Moment:
 
     @property
     def length(self) -> str:
-        return "PNG" if self.kind == "SHOT" else self.kind
+        return {"SHOT": "PNG", "GIF": "GIF", "CLIP": "MP4"}.get(self.kind, self.kind)
+
+    @property
+    def image(self) -> str | None:
+        """What the gallery can show: the file itself, or a video's poster frame."""
+        if self.kind in ("SHOT", "GIF"):
+            return self.path
+        p = poster_for(self.path)
+        return str(p) if p.is_file() else None
+
+
+def poster_for(path) -> Path:
+    p = Path(path)
+    return p.parent / ".posters" / f"{p.stem}.png"
 
 
 def _safe(s: str) -> str:
@@ -62,7 +76,7 @@ def list_moments() -> list[Moment]:
             created = float(parts[2]) if len(parts) > 2 else p.stat().st_mtime
         except ValueError:
             created = p.stat().st_mtime
-        label = {"SHOT": "Screenshot", "GIF": "Recording", "CLIP": "Clip"}[kind]
+        label = {"SHOT": "Screenshot", "GIF": "GIF", "CLIP": "Video"}[kind]
         out.append(Moment(str(p), f"{label} · {time.strftime('%H:%M', time.localtime(created))}",
                           game, system, kind, created))
     return sorted(out, key=lambda m: -m.created)

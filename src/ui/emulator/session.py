@@ -23,7 +23,7 @@ from src.bridge import savestate
 from src.bridge.adaptors import GamepadAdaptor, InputRouter
 from src.bridge.runner import EmulatorRunner, Stats
 from src.ui.data.library import Game
-from src.ui.data.moments import new_path
+from src.ui.data.moments import new_path, poster_for
 from src.ui.data.settings import Settings, data_dir
 from src.ui.emulator import frame as fr
 from src.ui.theme import GB_PALETTES
@@ -317,23 +317,31 @@ class EmulatorSession:
     def recording(self) -> bool:
         return self.runner.recorder.recording
 
-    def _gif_opts(self) -> dict:
-        w, _ = self._native()
+    @property
+    def record_ext(self) -> str:
+        return ".gif" if self.settings.record_format == "gif" else ".mp4"
+
+    def _video_target(self) -> tuple:
+        """(output path, encoder options) for the chosen format."""
+        path = new_path(self.game.title, self.game.system, self.record_ext)
         transform = fr.lcd_correct if (self.game.system == "GBC" and self.settings.lcd_colors) else None
-        return {"scale": 2 if w <= 160 else 1, "transform": transform}
+        opts = {"transform": transform}
+        if path.suffix == ".mp4":
+            opts["poster"] = poster_for(path)
+        return path, opts
 
     def start_recording(self) -> None:
         self.runner.recorder.start(self.runner.frames)
 
     def stop_recording(self, on_done=None) -> bool:
         """Stop and encode in the background; on_done(path | None, error)."""
-        path = new_path(self.game.title, self.game.system, ".gif")
-        return self.runner.recorder.stop(path, on_done=on_done, **self._gif_opts())
+        path, opts = self._video_target()
+        return self.runner.recorder.stop(path, on_done=on_done, **opts)
 
     def clip(self, seconds: float = 30, on_done=None) -> bool:
-        """Save the last `seconds` of play as a GIF (background)."""
-        path = new_path(self.game.title, self.game.system, ".gif")
-        return self.runner.recorder.clip(path, seconds=seconds, on_done=on_done, **self._gif_opts())
+        """Save the last `seconds` of play (background), as MP4 or GIF."""
+        path, opts = self._video_target()
+        return self.runner.recorder.clip(path, seconds=seconds, on_done=on_done, **opts)
 
     def set_replay_buffer(self, on: bool) -> None:
         self.runner.recorder.replay_on = bool(on)

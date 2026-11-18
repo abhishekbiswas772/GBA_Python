@@ -35,8 +35,8 @@ Rewind, save states, recording
 Every ``INTERVAL`` emulated frames a snapshot goes into ``runner.rewind``
 (:mod:`src.bridge.rewind`).  ``set_rewinding(True)`` walks back through them,
 silent and about 3x faster than real time.  Every drawn frame is offered to
-``runner.recorder`` (:mod:`src.bridge.recorder`) for GIF recording and the
-"last 30 s" clip buffer.  ``submit(fn)`` runs ``fn(machine)`` on the worker
+``runner.recorder`` (:mod:`src.bridge.recorder`), together with each frame's
+sound, for MP4 / GIF recording and the "last 30 s" clip buffer.  ``submit(fn)`` runs ``fn(machine)`` on the worker
 between two frames and returns a Future; save states use it so nothing ever
 touches a core mid-frame.
 
@@ -198,6 +198,7 @@ class EmulatorRunner:
             self.audio = _open_audio(self.machine.apu)
         if self._want_rewind:
             self.rewind = RewindBuffer(self.machine.fps)
+        self.recorder.fps = self.machine.fps
         self._publish()                              # first (blank) frame right away
         self.ready.set()
         try:
@@ -257,11 +258,7 @@ class EmulatorRunner:
                     held.discard(name)
                     m.release(name)
 
-            if audio is not None:
-                if realtime:
-                    audio.pump(self._volume)
-                else:
-                    m.apu.take_samples()              # fast-forward: drop the audio
+            self._route_audio(m, audio, realtime)
             if draw:
                 skipped_row = 0
                 self._publish()
@@ -364,8 +361,27 @@ class EmulatorRunner:
                 self._stop = True
                 return deferred
 
+    def _route_audio(self, m, audio, realtime: bool) -> None:
+        """This frame's sound goes to the recorder (always, in game time) and to the
+        speakers (only at 1x; fast-forward is silent)."""
+        apu, rec = m.apu, self.recorder
+        wants = rec.wants_audio
+        if audio is None and wants and not apu.sampling:
+            apu.sampling = True                       # no sound card, but recordings want sound
+        if not apu.sampling:
+            return
+        data = apu.take_samples()
+        if wants:
+            try:
+                rec.feed_audio(data, self.frames)
+            except Exception:
+                pass
+        if audio is not None and realtime:
+            audio.pump(self._volume, data)
+
     def _core_changed(self) -> None:
         """The machine got a new core object (reset / state loaded from disk)."""
+        self.recorder.fps = self.machine.fps
         if self.audio is not None:
             self.audio.retarget(self.machine.apu)
         if self.rewind is not None:
@@ -445,8 +461,9 @@ def _open_audio(apu):
             super().__init__(apu, target=AUDIO_TARGET)
             self.low = int(AUDIO_LOW * self.RATE) * self.BYTES_PER_FRAME
 
-        def pump(self, volume: _Volume | None = None) -> None:
-            data = self.apu.take_samples()
+        def pump(self, volume: _Volume | None = None, data=None) -> None:
+            if data is None:
+                data = self.apu.take_samples()
             if len(data) < 2:
                 return
             q = self.queued()

@@ -130,13 +130,13 @@ def _build(app: "App", s) -> ft.KeyboardListener:
     def gif_done(path, err) -> None:              # encoder thread -> UI loop
         async def show() -> None:
             if err is not None:
-                app.toast(f"Couldn't save the GIF: {err}")
+                app.toast(f"Couldn't save the video: {err}")
                 return
             ui.toast = str(path)
             if app.route == "player":
                 app.render()
             else:
-                app.toast("GIF saved to Moments")
+                app.toast("Saved to Moments")
         try:
             app.page.run_task(show)
         except Exception:
@@ -145,7 +145,7 @@ def _build(app: "App", s) -> ft.KeyboardListener:
     def toggle_record(e=None) -> None:
         if s.recording:
             s.stop_recording(on_done=gif_done)
-            app.toast("Recording saved; encoding the GIF…")
+            app.toast(f"Recording stopped; saving the {s.record_ext[1:].upper()}…")
         else:
             s.start_recording()
             app.toast("Recording… press again to stop")
@@ -167,7 +167,7 @@ def _build(app: "App", s) -> ft.KeyboardListener:
             app.toast("Turn on the replay buffer to clip the last 30 s")
             return
         if s.clip(30, on_done=gif_done):
-            app.toast("Saving the last 30 s as a GIF…")
+            app.toast(f"Saving the last 30 s as {s.record_ext[1:].upper()}…")
         else:
             app.toast("Nothing to clip yet")
 
@@ -362,10 +362,17 @@ def _build(app: "App", s) -> ft.KeyboardListener:
         s.set_replay_buffer(v)
         app.render()
 
+    def on_format(v: str) -> None:
+        settings.record_format = v
+        settings.save()
+        app.render()
+
     panel.append(ft.Container(ft.Column([
         c.setting_row("Volume", volume, t),
         c.setting_row("Replay buffer (last 30 s)", c.checkbox(settings.replay_buffer, on_replay, t,
                                                               "Replay buffer"), t),
+        c.setting_row("Record as", c.segmented([("mp4", "MP4 + sound"), ("gif", "GIF")],
+                                               settings.record_format, on_format, t), t),
     ], spacing=12), padding=ft.Padding.only(top=16), border=ft.Border.only(top=ft.BorderSide(1, t.line)),
         margin=ft.Margin.only(top=0)))
     panel.insert(-1, c.spacer())

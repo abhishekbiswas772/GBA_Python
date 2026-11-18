@@ -190,6 +190,70 @@ def test_recording_and_clip_make_gifs(tmp_path):
     assert not rec.recording
 
 
+def _tone(n: int, freq: float = 440.0):
+    import math
+    from array import array
+    return array("h", (v for i in range(n) for v in (int(8000 * math.sin(i * freq * 6.2832 / 44100)),) * 2))
+
+
+def test_mp4_has_video_and_sound_in_sync(tmp_path):
+    av = pytest.importorskip("av")
+    rec = Recorder(replay=True, replay_seconds=2)
+    rec.fps = 60.0
+    rec.start(0)
+    w, h = 256, 240
+    for n in range(1, 181):                     # 3 s; only every 3rd frame drawn (frameskip)
+        if n % 3 == 0:
+            rec.feed(bytes([n % 256, 0, 0]) * (w * h), w, h, n)
+        rec.feed_audio(_tone(735), n)
+    done = []
+    poster = tmp_path / ".posters" / "rec.png"
+    assert rec.stop(tmp_path / "rec.mp4", poster=poster, on_done=lambda p, e: done.append(e))
+    assert rec.clip(tmp_path / "clip.mp4", seconds=1, on_done=lambda p, e: done.append(e))
+    t0 = time.time()
+    while len(done) < 2 and time.time() - t0 < 60:
+        time.sleep(0.05)
+    assert done == [None, None]
+    with av.open(str(tmp_path / "rec.mp4")) as c:
+        v, a = c.streams.video[0], c.streams.audio[0]
+        assert (v.codec_context.name, a.codec_context.name) == ("h264", "aac")
+        assert (v.width, v.height) == (768, 720)                  # NES 3x, nearest
+        assert a.sample_rate == 44100 and a.channels == 2
+        vdur, adur = float(v.duration * v.time_base), float(a.duration * a.time_base)
+        assert vdur == pytest.approx(3.0, abs=0.15) and adur == pytest.approx(vdur, abs=0.1)
+        rs = av.AudioResampler(format="s16", layout="stereo", rate=44100)
+        pcm = b"".join(bytes(g.planes[0]) for f in c.decode(audio=0) for g in rs.resample(f))
+        assert max(pcm[1::2]) > 0x10                              # the tone is audible, not silence
+    with av.open(str(tmp_path / "clip.mp4")) as c:
+        assert float(c.streams.video[0].duration * c.streams.video[0].time_base) == pytest.approx(1.0, abs=0.15)
+    assert poster.is_file()
+
+
+def test_gif_still_available(tmp_path):
+    pytest.importorskip("PIL")
+    rec = Recorder(replay=False)
+    rec.start(0)
+    for n in range(1, 61):
+        rec.feed(bytes([n, 0, 0]) * (160 * 144), 160, 144, n)
+        rec.feed_audio(_tone(735), n)
+    done = []
+    assert rec.stop(tmp_path / "x.gif", on_done=lambda p, e: done.append(e))
+    t0 = time.time()
+    while not done and time.time() - t0 < 30:
+        time.sleep(0.05)
+    assert done == [None] and (tmp_path / "x.gif").read_bytes()[:3] == b"GIF"
+
+
+def test_replay_audio_is_bounded():
+    rec = Recorder(replay=True, replay_seconds=1)
+    for n in range(1, 601):                     # 10 s of game time
+        if n % 2 == 0:
+            rec.feed(b"\0" * 12, 2, 2, n)
+        rec.feed_audio(b"\0" * 2940, n)
+    first_video = rec._replay.items[0][0]
+    assert rec._replay.audio[0][0] >= first_video and len(rec._replay.audio) <= 62
+
+
 def test_empty_recording_is_not_saved(tmp_path):
     rec = Recorder(replay=False)
     rec.start()
@@ -212,6 +276,7 @@ def test_runner_submit_save_load_and_rewind(tmp_path):
         assert r.rewind is not None and len(r.rewind) > 0
         f = tmp_path / "s.state"
         r.submit(lambda m: savestate.save_file(m, f)).result(5)
+        assert r.recorder._replay.audio, "game audio reaches the replay buffer without a sound card"
         r.set_paused(True)
         assert r.submit(lambda m: m.system).result(5) == "NES"   # works while paused
         r.submit(lambda m: savestate.load_file(m, f)).result(5)

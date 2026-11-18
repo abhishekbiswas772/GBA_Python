@@ -108,6 +108,7 @@ class Settings:
     frame_blend: bool = False
     volume: int = 70
     replay_buffer: bool = True
+    record_format: str = "mp4"          # mp4 (video + sound) | gif (silent)
     rom_dirs: list[str] = field(default_factory=lambda: [str(Path.home() / "Games" / "ROMs")])
     extra_roms: list[str] = field(default_factory=list)
     save_dir: str = ""               # battery saves; "" = default_save_dir()

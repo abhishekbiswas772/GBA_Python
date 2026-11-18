@@ -10,8 +10,9 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "av>=14",              # MP4 recording with sound (FFmpeg bundled)
     "flet[all]",
-    "pillow>=11",          # GIF recording / clips (src/bridge/recorder)
+    "pillow>=11",          # GIFs, video frames (src/bridge/recorder)
 ]
 
 # pygame has no Android wheel. Desktop builds opt in below; `uv sync` still
