@@ -170,7 +170,7 @@ def button(content: str | ft.Control | Sequence[ft.Control], on_click: Handler, 
         box = ft.Container(
             body, bgcolor=bg, height=height, width=width, padding=pad(h_pad, 0),
             border_radius=radius, border=border(side) if side else None,
-            alignment=align or ft.Alignment.CENTER, expand=expand, opacity=0.4 if disabled else None,
+            alignment=align or ft.Alignment.CENTER, expand=expand, opacity=0.4 if disabled else 1.0,
         )
         return tap(box, None if disabled else on_click, tooltip=tooltip, expand=expand, col=col)
 
