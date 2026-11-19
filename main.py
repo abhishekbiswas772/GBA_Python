@@ -113,6 +113,14 @@ def cmd_app(args) -> None:
 def cmd_info(args) -> None:
     rom = _check_rom(args.rom)
     system = _system(rom)
+    if system == "PS1":
+        import struct
+        head = Path(rom).read_bytes()[:0x800]
+        pc, _gp, addr, size = struct.unpack_from("<4I", head, 0x10)
+        region = head[0x4C:0x800].split(b"\0", 1)[0].decode("latin-1").strip()
+        print(f"[PS1] PS-X EXE, entry {pc:#010x}, loads {size:,} bytes at {addr:#010x}"
+              + (f", {region}" if region else ""))
+        return
     if system == "GBA":
         from src.core.gba.cartridge import Cartridge
     elif system == "NES":
@@ -217,6 +225,31 @@ def _play_nes(args, headless: bool) -> None:
           + _speed(nes.cpu.cyc, CPU_HZ, secs, "NES"))
 
 
+def _play_ps1(args, headless: bool) -> None:
+    if not headless:
+        sys.exit("The PS1 core runs in the desktop app: uv run python main.py app "
+                 f"\"{args.rom}\" (or `main.py run` for a headless test run)")
+    from src.bridge import load
+    try:
+        m = load(args.rom)
+    except RuntimeError as e:
+        sys.exit(f"error: {e}")
+    print(f"[PS1] {m.title_info}")
+    frames = args.frames if args.frames is not None else 600
+    t0 = time.time()
+    try:
+        for _ in range(frames):
+            m.run_frame()
+            if m.tty:
+                sys.stdout.write(bytes(m.tty).decode("latin-1"))
+                m.tty.clear()
+    except KeyboardInterrupt:
+        print("\n[Stopped by user]")
+    secs = time.time() - t0
+    n = m.core.frames
+    print(f"\n{n:,} frames in {secs:.1f}s ({n / max(secs, 1e-9) / m.fps * 100:.0f}% speed)")
+
+
 def cmd_play(args, headless: bool | None = None) -> None:
     args.rom = _check_rom(args.rom)
     ensure_save_dir()
@@ -224,7 +257,9 @@ def cmd_play(args, headless: bool | None = None) -> None:
         headless = bool(args.headless or args.frames is not None or args.doctor
                         or args.steps is not None)
     system = _system(args.rom)
-    if system == "GBA":
+    if system == "PS1":
+        _play_ps1(args, headless)
+    elif system == "GBA":
         _play_gba(args, headless)
     elif system == "NES":
         _play_nes(args, headless)
@@ -240,7 +275,7 @@ def cmd_run(args) -> None:
 
 # ------------------------------------------------------------------ CLI
 def _play_options(p: argparse.ArgumentParser) -> None:
-    p.add_argument("rom", help=".gb / .gbc / .gba file")
+    p.add_argument("rom", help=".gb / .gbc / .gba / .nes / PS-X .exe file")
     p.add_argument("--scale", default=3, type=int, help="window scale factor (default 3)")
     p.add_argument("--mute", action="store_true", help="disable audio output")
     p.add_argument("--keys", choices=("classic", "app"), default="classic",

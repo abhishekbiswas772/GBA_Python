@@ -58,6 +58,8 @@ class Machine:
     height: int = 0
     #: target video refresh rate in Hz (59.7275 for every system here)
     fps: float = 60.0
+    #: False for a core that can't snapshot yet (no save states, no rewind)
+    supports_states: bool = True
 
     # ------------------------------------------------------------------ running
     def run_frame(self, render: bool = True) -> None:

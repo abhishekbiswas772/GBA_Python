@@ -228,6 +228,13 @@ API as every other core. The emulation loop runs in Rust and releases the GIL.
 uv run python -m src.core.ps1.build      # cargo build --release, then copies _ps1.pyd / _ps1.so into src/core/ps1/
 ```
 
+Then open a PS-X EXE in the app, or try one from the command line:
+
+```bash
+uv run python main.py info tests/roms/ps1/cop/cop.exe          # EXE header
+uv run python main.py run tests/roms/ps1/gp0-e1/gp0-e1.exe     # headless, prints the program's TTY output
+```
+
 Without that step the rest of the app is unchanged. PS1 games show up in the library, and opening one says how to build the core.
 
 **What runs today: PS-X EXE programs** (`.exe` / `.psx` files starting with `PS-X EXE`). Homebrew and test programs work; commercial games need the CD-ROM milestone. Windows `.exe` files in a ROM folder are ignored, because only the PS-X header counts.
@@ -238,8 +245,9 @@ Without that step the rest of the app is unchanged. PS1 games show up in the lib
 | Memory map, DMA (GPU, OTC, SPU, CD-ROM; block and linked list), IRQs, timers (system, dot and hblank clocks) | ✅ |
 | GPU: triangles and quads (flat, Gouraud, textured 4/8/15-bit with CLUT), lines, rectangles, fills, VRAM copies, blending, mask bit, dithering | ✅ |
 | Digital pad (SIO) | ✅ |
-| Boot without a BIOS: a small HLE kernel (events, threads, TTY, `printf`, pads) | ✅ |
-| Boot with your own BIOS (**Settings → BIOS & firmware**) | ✅ (EXE sideloaded at the shell) |
+| Boot without a BIOS: a small HLE kernel (exceptions, events, TTY, `printf`, pads) | ✅ runs every bundled test |
+| Boot with your own BIOS (**Settings → BIOS & firmware**), EXE sideloaded at the shell | ⚠️ implemented, not yet tested against a real BIOS |
+| Save states and rewind | 🚧 not yet: the save prompt, slots and rewind are switched off for PS1 games |
 | CD-ROM (`.cue` / `.bin`) | 🚧 milestone 2 |
 | GTE (3D maths coprocessor) | 🚧 milestone 3: registers only, commands are stubs |
 | SPU (sound) | 🚧 milestone 4: registers and RAM only, output is silence |
@@ -512,7 +520,7 @@ Push a tag like `v0.2.0` and GitHub Actions builds both apps and publishes them 
 ## 🧭 Honest limits
 
 - Cheats, achievements and link play are UI previews for now; the cores don't implement them yet.
-- The PS1 core is experimental: PS-X EXE programs only, no sound, no 3D maths, no save states yet. CI and packaged builds don't compile it yet, so it is available when you build from source.
+- The PS1 core is experimental: PS-X EXE programs only, no sound, no 3D maths, no save states or rewind yet. Booting through a real BIOS is implemented but untested. CI and packaged builds don't compile it yet, so it is available when you build from source.
 - Sound uses SDL through pygame, so it works in the desktop app only.
 - The NES core is NTSC only. PAL and mappers beyond the ones listed above are welcome contributions.
 

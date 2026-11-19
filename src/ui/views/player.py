@@ -89,7 +89,13 @@ def _build(app: "App", s) -> ft.KeyboardListener:
         app.page.update()
 
     # ---------------------------------------------------------------- save states
+    no_states = f"Save states aren't available for {s.game.system} yet"
+
     def quick_save(e=None) -> None:
+        if not s.supports_states:
+            app.toast(no_states)
+            return
+
         async def go() -> None:
             try:
                 await s.save_state(s.slot)
@@ -100,6 +106,9 @@ def _build(app: "App", s) -> ft.KeyboardListener:
         app.page.run_task(go)
 
     def quick_load(e=None, slot: int | None = None) -> None:
+        if not s.supports_states:
+            app.toast(no_states)
+            return
         n = s.slot if slot is None else slot
 
         async def go() -> None:
@@ -116,6 +125,9 @@ def _build(app: "App", s) -> ft.KeyboardListener:
     # ---------------------------------------------------------------- rewind
     def rewind_burst(e=None) -> None:
         """Toolbar button: rewind for a moment (hold the hotkey for longer)."""
+        if not s.supports_states:
+            app.toast(f"Rewind isn't available for {s.game.system} yet")
+            return
         if not s.rewind_seconds:
             app.toast("Nothing to rewind yet")
             return
@@ -433,6 +445,15 @@ def _leave(app: "App", route: str) -> None:
 # -------------------------------------------------------------------- panel tabs
 def _saves(app: "App", set_slot, set_speed, quick_save, quick_load) -> ft.Control:
     t, s, hk = app.t, app.session, app.settings.hotkeys
+    if not s.supports_states:
+        return ft.Column([
+            c.heading("Save states", t, 15),
+            c.text(f"Save states and rewind aren't available for {s.game.system} yet: the core can't "
+                   "snapshot itself. They are on the roadmap.", size=13, color=t.muted),
+            ft.Container(c.heading("Speed", t, 15), margin=ft.Margin.only(top=12)),
+            c.segmented([(str(v), f"{v}×") for v in (1, 2, 4, 8)], str(s.speed), set_speed, t,
+                        mono_font=True, equal=True),
+        ], spacing=10)
     info = {e["slot"]: e for e in s.slot_info()}
     rows: list[ft.Control] = [ft.Row([c.heading("Save states", t, 15), ft.Container(expand=True),
                                       c.text(f"{hk.get('quick_save', '')} save · {hk.get('quick_load', '')} load",

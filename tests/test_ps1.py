@@ -116,3 +116,31 @@ def test_bridge_rejects_non_exe(tmp_path):
     fake.write_bytes(b"MZ" + bytes(4000))
     with pytest.raises(ValueError):
         load(fake)
+
+
+@needs_core
+def test_runs_in_the_real_runner(tmp_path):
+    """The worker thread with default settings (rewind + replay on) on a PS1 game."""
+    import time
+
+    from src.bridge import load
+    from src.bridge.runner import EmulatorRunner
+    r = EmulatorRunner(lambda: load(ROMS / "triangle" / "triangle.exe"), audio=False)
+    r.start()
+    try:
+        assert r.ready.wait(10)
+        time.sleep(1.5)
+        assert r.error is None, r.error
+        assert r.frames > 30
+        assert r.rewind is None                      # no snapshots: rewind is off, not crashing
+        assert r.submit(lambda m: m.supports_states).result(5) is False
+        r.press("A")
+        r.release("A")
+        r.set_paused(True)
+        assert r.submit(lambda m: m.system).result(5) == "PS1"
+        r.set_paused(False)
+        r.reset()
+        time.sleep(0.5)
+        assert r.error is None, r.error
+    finally:
+        r.close()

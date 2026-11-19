@@ -175,3 +175,26 @@ def test_leaving_a_game_pauses_and_asks_to_save(app, monkeypatch):
     app.go("library")
     page.dialogs[-1].actions[1].on_click(None)               # Leave without saving
     assert app.route == "library" and app.session is None
+
+
+def test_ps1_has_no_save_prompt_or_slots(app, monkeypatch):
+    """The PS1 core can't snapshot yet: leaving goes straight out, the panel says why."""
+    from src.bridge import load
+    from src.core import ps1
+    from src.ui.emulator import session as sess
+    from src.ui.views import player
+    game = next((g for g in app.games if g.system == "PS1"), None)
+    if game is None or not ps1.AVAILABLE:
+        pytest.skip("no PS1 test EXE or core not built")
+    page = app.page
+    page.show_dialog = page.dialogs.append
+    monkeypatch.setattr(sess.EmulatorSession, "start", lambda self: None)
+    s = sess.EmulatorSession(page, game, app.settings)
+    s.runner.machine = load(game.path)
+    app.session, app.route = s, "player"
+    assert not s.supports_states
+    panel = player._saves(app, lambda n: None, lambda v: None, lambda e=None: None, lambda e=None, slot=None: None)
+    _walk(panel, set())
+    assert "aren't available for PS1" in panel.controls[1].value
+    app.go("library")
+    assert not page.dialogs and app.route == "library" and app.session is None

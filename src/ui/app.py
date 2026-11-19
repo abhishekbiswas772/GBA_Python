@@ -114,7 +114,7 @@ class App:
         assert route in ROUTES, route
         if (not confirmed and route != "player" and self.route == "player"
                 and self.session is not None and self.session.machine is not None
-                and not self.session.error):
+                and not self.session.error and self.session.supports_states):
             self._confirm_leave(route)           # pause and offer to save first
             return
         playing = self.session.game.system if self.session else None

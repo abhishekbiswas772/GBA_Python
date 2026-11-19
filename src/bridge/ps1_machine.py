@@ -50,6 +50,7 @@ class PS1Machine(Machine):
 
     system = "PS1"
     width, height = CANVAS
+    supports_states = False          # save states / rewind: a later milestone
 
     def __init__(self, rom, bios=None):
         if not core.AVAILABLE:

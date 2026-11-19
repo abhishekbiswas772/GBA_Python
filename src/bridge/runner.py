@@ -196,7 +196,7 @@ class EmulatorRunner:
             return
         if self._want_audio:
             self.audio = _open_audio(self.machine.apu)
-        if self._want_rewind:
+        if self._want_rewind and getattr(self.machine, "supports_states", True):
             self.rewind = RewindBuffer(self.machine.fps)
         self.recorder.fps = self.machine.fps
         self._publish()                              # first (blank) frame right away
