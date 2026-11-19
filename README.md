@@ -5,8 +5,8 @@
 <h1 align="center">GBA Python</h1>
 
 <p align="center">
-  <b>Game Boy · Game Boy Color · Game Boy Advance · NES</b><br/>
-  Four consoles emulated from scratch in pure Python, with a modern Flet desktop app on top.
+  <b>Game Boy · Game Boy Color · Game Boy Advance · NES · PlayStation (experimental)</b><br/>
+  Four consoles emulated from scratch in pure Python, an experimental PS1 core in Rust, and a modern Flet desktop app on top.
 </p>
 
 <p align="center">
@@ -57,6 +57,7 @@
 ## ✨ Highlights
 
 - **Four cores, zero native code.** The Game Boy, Game Boy Color, GBA and NES are all written in Python, using only the standard library.
+- **An experimental PlayStation core in Rust.** A 33.8 MHz MIPS CPU plus a software GPU is too much for an interpreter in Python, so the PS1 core is written in Rust and loaded through PyO3. It is optional: without Rust, everything else still works. See [PlayStation (experimental)](#-playstation-experimental).
 - **Accurate where it counts.** The cores pass the nestest trace line by line, blargg's CPU, APU, PPU and MMC3 suites, Acid2, and jsmolka's GBA tests.
 - **Smooth when Python is slow.** A worker thread paces itself on the audio clock. Auto-frameskip keeps the game and the sound at 100% when drawing can't keep up.
 - **A real library app.**
@@ -176,7 +177,7 @@ Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest fi
 
 | Section | What's there |
 |---|---|
-| **Controls** | A separate keyboard layout for each of GB, GBC, GBA and NES (pick one under **Layout for**). Click a binding, then press a key; a key already in use moves to the new action. Also the gamepad layout and every hotkey. |
+| **Controls** | A separate keyboard layout for each of GB, GBC, GBA, NES and PS1 (pick one under **Layout for**). Click a binding, then press a key; a key already in use moves to the new action. Also the gamepad layout and every hotkey. |
 | **Audio** | Volume. Sound plays through SDL in the desktop app. |
 | **Paths & saves** | ROM folders to scan, and the save folder (change it, open it, or reset it to the default). |
 
@@ -191,8 +192,8 @@ Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest fi
 
 | What | Where |
 |---|---|
-| Your ROMs | `rom/gb`, `rom/gb_color`, `rom/gba`, `rom/nes`, or any folder you add |
-| Battery saves | `saves/<console>/<game>/<game>.sav` (`gb`, `gbc`, `gba` or `nes`) |
+| Your ROMs | `rom/gb`, `rom/gb_color`, `rom/gba`, `rom/nes`, `rom/ps1`, or any folder you add |
+| Battery saves | `saves/<console>/<game>/<game>.sav` (`gb`, `gbc`, `gba`, `nes` or `ps1`) |
 | Save states | `saves/<console>/<game>/states/slot<N>.state` (+ `.png` thumbnail) |
 | Screenshots, recordings, clips | `~/.gba_python/moments/` |
 | Settings, covers | `~/.gba_python/` (the app storage folder when packaged) |
@@ -209,7 +210,57 @@ Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest fi
 | Fast-forward (2×, 4×, 8×, hold `F`) | ✅ |
 | Screenshots | ✅ |
 | Recording and clip of the last 30 s, as MP4 with sound or GIF | ✅ |
+| PlayStation: PS-X EXE programs (CPU, GPU, DMA, timers, pad) | 🧪 experimental, Rust core |
+| PlayStation: CD games, 3D (GTE), sound (SPU), memory cards, save states | 🚧 next milestones |
 | Cheats, achievements, link play | 🚧 UI preview, not in the cores yet |
+
+---
+
+## 🧪 PlayStation (experimental)
+
+The PS1 core lives in [`src/core/ps1/native`](src/core/ps1/native), a Rust crate built as a Python
+extension with [PyO3](https://pyo3.rs). The app talks to it through `PS1Machine`, the same `Machine`
+API as every other core. The emulation loop runs in Rust and releases the GIL.
+
+**Build it once** (needs [Rust](https://rustup.rs); on Windows also the Visual Studio Build Tools with the C++ workload):
+
+```bash
+uv run python -m src.core.ps1.build      # cargo build --release, then copies _ps1.pyd / _ps1.so into src/core/ps1/
+```
+
+Without that step the rest of the app is unchanged. PS1 games show up in the library, and opening one says how to build the core.
+
+**What runs today: PS-X EXE programs** (`.exe` / `.psx` files starting with `PS-X EXE`). Homebrew and test programs work; commercial games need the CD-ROM milestone. Windows `.exe` files in a ROM folder are ignored, because only the PS-X header counts.
+
+| Part | Status |
+|---|---|
+| R3000A CPU: load and branch delay slots, COP0 exceptions, bus errors, cache isolation | ✅ |
+| Memory map, DMA (GPU, OTC, SPU, CD-ROM; block and linked list), IRQs, timers (system, dot and hblank clocks) | ✅ |
+| GPU: triangles and quads (flat, Gouraud, textured 4/8/15-bit with CLUT), lines, rectangles, fills, VRAM copies, blending, mask bit, dithering | ✅ |
+| Digital pad (SIO) | ✅ |
+| Boot without a BIOS: a small HLE kernel (events, threads, TTY, `printf`, pads) | ✅ |
+| Boot with your own BIOS (**Settings → BIOS & firmware**) | ✅ (EXE sideloaded at the shell) |
+| CD-ROM (`.cue` / `.bin`) | 🚧 milestone 2 |
+| GTE (3D maths coprocessor) | 🚧 milestone 3: registers only, commands are stubs |
+| SPU (sound) | 🚧 milestone 4: registers and RAM only, output is silence |
+| Memory cards, MDEC (video), save states and rewind | 🚧 later |
+
+**Accuracy.** Checked against real-console output from [JaCzekanski's ps1-tests](https://github.com/JaCzekanski/ps1-tests) (MIT). Ten of them are bundled in `tests/roms/ps1` with their hardware logs and VRAM dumps:
+
+| Test | Result |
+|---|---|
+| `cpu/cop`, `cpu/code-in-io`, `dma/dpcr`, `dma/otc-test`, `gpu/gp0-e1`, `gpu/mask-bit` | ✅ console log matches |
+| `gpu/rectangles`, `gpu/quad`, `gpu/transparency` | ✅ VRAM matches the console |
+| `gpu/triangle` | ✅ within one 5-bit step on Gouraud colours (0.4% of pixels round differently) |
+| `gpu/clut-cache`, `gpu/lines`, `gpu/texture-flip`, `gpu/uv-interpolation` (not bundled) | 98.8–99.9% of pixels |
+| `cpu/access-time`, `dma/chopping`, `dma/chain-looping`, `gpu/bandwidth` | ❌ memory wait states and DMA timing aren't modelled yet |
+| `gte/*` | ❌ needs the GTE |
+
+**Speed.** About 220–250 emulated frames per second on the bundled tests (roughly 4× real time), measured on a laptop, including frame copies to Python.
+
+**Buttons.** The shared layout maps onto the pad as **A → ✕**, **B → ○**, **L / R → L1 / R1**, plus Start, Select and the D-pad. △, □, L2 and R2 can be pressed from code (`PS1Machine.press_ps1`); they will get keys when games need them.
+
+**BIOS.** Optional for EXEs. A BIOS is Sony's copyrighted firmware: the app never ships or downloads one, so dump it from your own console.
 
 ---
 
@@ -404,6 +455,8 @@ main.py                  launcher and flet build entry
 src/core/gameboy/        DMG and CGB
 src/core/gba/            ARM, PPU, APU, DMA, timers, HLE BIOS, RTC
 src/core/nes/            6502 CPU, PPU, APU, mappers, cartridge
+src/core/ps1/            experimental PS1 core: Python wrapper + build helper
+src/core/ps1/native/     the Rust crate (CPU, GPU, DMA, timers, pad, HLE kernel)
 src/core/adaptors/saves/     where battery saves live (per console, per game)
 src/core/adaptors/snapshot/  save-state hooks the cores implement
 src/bridge/              Machine API, EmulatorRunner, keyboard / gamepad / touch adaptors
@@ -411,7 +464,7 @@ src/bridge/savestate/    save states: in-memory snapshots, state files, slots
 src/bridge/rewind/       rewind ring buffer
 src/bridge/recorder/     MP4 (with sound) / GIF recording and the 30 s replay buffer
 src/ui/                  Flet app (library, player, settings, themes)
-tests/roms/              open test ROMs: blargg, Acid2, jsmolka, nes-test-roms
+tests/roms/              open test ROMs: blargg, Acid2, jsmolka, nes-test-roms, ps1-tests
 docs/                    README media and make_media.py
 rom/                     yours, git-ignored
 saves/                   battery saves, one folder per console and game (git-ignored)
@@ -439,6 +492,7 @@ uv run python -m tests.run_tests       # Game Boy blargg speed report
 | blargg MMC3 IRQ: clocking, details, A12 | ✅ (scanline timing: in progress) |
 | blargg `ppu_vbl_nmi` | 9/10 (even/odd frame timing in progress) |
 | blargg Game Boy `cpu_instrs`, DMG Acid2, CGB Acid2, jsmolka GBA | ✅ |
+| ps1-tests (10 bundled; skipped when the PS1 core isn't built) | ✅ see [PlayStation](#-playstation-experimental) |
 
 Commercial carts are optional, and those tests are skipped when `rom/` is empty. They run from a temporary copy, so a real `.sav` is never touched.
 
@@ -458,6 +512,7 @@ Push a tag like `v0.2.0` and GitHub Actions builds both apps and publishes them 
 ## 🧭 Honest limits
 
 - Cheats, achievements and link play are UI previews for now; the cores don't implement them yet.
+- The PS1 core is experimental: PS-X EXE programs only, no sound, no 3D maths, no save states yet. CI and packaged builds don't compile it yet, so it is available when you build from source.
 - Sound uses SDL through pygame, so it works in the desktop app only.
 - The NES core is NTSC only. PAL and mappers beyond the ones listed above are welcome contributions.
 

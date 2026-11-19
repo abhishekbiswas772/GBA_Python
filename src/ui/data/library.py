@@ -8,13 +8,14 @@ from pathlib import Path
 
 from src.ui.data.settings import Settings
 
-ROM_EXTS = {".gb": "GB", ".gbc": "GBC", ".cgb": "GBC", ".gba": "GBA", ".agb": "GBA", ".nes": "NES"}
+ROM_EXTS = {".gb": "GB", ".gbc": "GBC", ".cgb": "GBC", ".gba": "GBA", ".agb": "GBA", ".nes": "NES",
+            ".exe": "PS1", ".psx": "PS1"}
 
 # Consoles the bundled core can actually run.
-PLAYABLE = {"GB", "GBC", "GBA", "NES"}
+PLAYABLE = {"GB", "GBC", "GBA", "NES", "PS1"}
 
 # Native screen size per system.
-NATIVE_SIZE = {"GB": (160, 144), "GBC": (160, 144), "GBA": (240, 160), "NES": (256, 240)}
+NATIVE_SIZE = {"GB": (160, 144), "GBC": (160, 144), "GBA": (240, 160), "NES": (256, 240), "PS1": (320, 240)}
 
 
 @dataclass
@@ -43,6 +44,10 @@ def _title_from_name(stem: str) -> str:
 
 def _detect_system(path: Path) -> str | None:
     system = ROM_EXTS.get(path.suffix.lower())
+    if system == "PS1":
+        # only real PS-X EXEs: a ROM folder may well contain Windows .exe files
+        from src.core.ps1 import is_exe
+        return system if is_exe(path) else None
     if system == "GB":
         try:                       # header CGB flag: 0x80 = enhanced, 0xC0 = CGB only
             with path.open("rb") as f:
@@ -93,7 +98,7 @@ def sort_games(games: list[Game], mode: str) -> list[Game]:
     if mode == "title":
         return sorted(games, key=lambda g: g.title.lower())
     if mode == "system":
-        order = {"GB": 0, "GBC": 1, "GBA": 2, "NES": 3}
+        order = {"GB": 0, "GBC": 1, "GBA": 2, "NES": 3, "PS1": 4}
         return sorted(games, key=lambda g: (order.get(g.system, 9), g.title.lower()))
     return sorted(games, key=lambda g: (-g.last_played, g.title.lower()))
 

@@ -50,7 +50,7 @@ class Machine:
     contract.
     """
 
-    #: "GB", "GBC", "GBA" or "NES"
+    #: "GB", "GBC", "GBA", "NES" or "PS1"
     system: str = "?"
     #: native screen width in pixels
     width: int = 0

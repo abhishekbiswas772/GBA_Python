@@ -69,7 +69,8 @@ class EmulatorSession:
         self._prev: bytes | None = None
         self._t_start = time.time()
         web = page is not None and bool(getattr(page, "web", False))
-        self.runner = EmulatorRunner(lambda: bridge.load(game.path), audio=not web,
+        ps1_bios = settings.ps1_bios if game.system == "PS1" and settings.ps1_bios else None
+        self.runner = EmulatorRunner(lambda: bridge.load(game.path, ps1_bios=ps1_bios), audio=not web,
                                      palette=self._palette(), name=f"emu:{game.filename}",
                                      replay=settings.replay_buffer)
         # save-state slots live in the game's save folder: saves/<core>/<game>/states/

@@ -32,9 +32,11 @@ class Theme:
     gold: str        # achievements
     shell: str       # handheld frame around exported video
     nes: str = "#FF7A6B"
+    ps1: str = "#8E9BFF"
 
     def system(self, system: str) -> str:
-        return {"GB": self.gb, "GBC": self.gbc, "GBA": self.gba, "NES": self.nes}.get(system, self.accent)
+        return {"GB": self.gb, "GBC": self.gbc, "GBA": self.gba, "NES": self.nes,
+                "PS1": self.ps1}.get(system, self.accent)
 
 
 THEMES: dict[str, Theme] = {
@@ -71,10 +73,12 @@ THEMES: dict[str, Theme] = {
 THEME_ORDER = ["midnight", "daylight", "dmg", "berry"]
 
 # Theme picked by "Match theme to console".
-CONSOLE_THEME = {"GB": "dmg", "GBC": "berry", "GBA": "midnight", "NES": "midnight"}
+CONSOLE_THEME = {"GB": "dmg", "GBC": "berry", "GBA": "midnight", "NES": "midnight", "PS1": "midnight"}
 
-SYSTEM_NAMES = {"GB": "Game Boy", "GBC": "Game Boy Color", "GBA": "Game Boy Advance", "NES": "NES"}
-SYSTEM_RES = {"GB": "160×144 · DMG", "GBC": "160×144 · Color", "GBA": "240×160", "NES": "256×240 · NTSC"}
+SYSTEM_NAMES = {"GB": "Game Boy", "GBC": "Game Boy Color", "GBA": "Game Boy Advance", "NES": "NES",
+                "PS1": "PlayStation (experimental)"}
+SYSTEM_RES = {"GB": "160×144 · DMG", "GBC": "160×144 · Color", "GBA": "240×160", "NES": "256×240 · NTSC",
+              "PS1": "320×240 · Rust core"}
 
 
 @dataclass(frozen=True)

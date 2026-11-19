@@ -20,6 +20,7 @@ GAMES = {
     "GBC": ROMS / "other" / "cgb-acid2.gbc",
     "GBA": ROMS / "gba" / "hello.gba",
     "NES": ROMS / "nes" / "scanline.nes",
+    "PS1": ROMS / "ps1" / "gp0-e1" / "gp0-e1.exe",
 }
 
 
@@ -83,6 +84,15 @@ def test_screens_validate(app, route):
     from src.ui.views import VIEWS
     app.route = route
     _walk(VIEWS[route](app), set())
+
+
+@pytest.mark.parametrize("section", ["General", "Emulation", "Audio", "Controls", "BIOS & firmware",
+                                     "Paths & saves"])
+def test_settings_sections_validate(app, section):
+    from src.ui.views import VIEWS
+    app.route = "settings"
+    app.ui.settings_section = section
+    _walk(VIEWS["settings"](app), set())
 
 
 @pytest.mark.parametrize("system", list(GAMES))

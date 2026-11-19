@@ -1,0 +1,25 @@
+[package]
+name = "ps1"
+version = "0.1.0"
+edition = "2021"
+description = "Experimental PlayStation (PS1) core for GBA Python, exposed to Python with PyO3"
+license = "MIT"
+publish = false
+
+[lib]
+name = "_ps1"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { version = "0.25", features = ["extension-module", "abi3-py313"], optional = true }
+
+[features]
+default = ["python"]
+python = ["dep:pyo3"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "unwind"
+debug = false

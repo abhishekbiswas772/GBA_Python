@@ -3,7 +3,7 @@
 By default (``set_save_dir`` never called) a save sits next to its ROM as
 ``<rom>.sav``, which is what the cores and their tests expect.  The app and
 ``main.py`` call :func:`set_save_dir` at start-up, and saves then go to
-``<save dir>/<core>/<game>/<game>.sav`` (core = "gb", "gbc", "gba" or "nes", game =
+``<save dir>/<core>/<game>/<game>.sav`` (core = "gb", "gbc", "gba", "nes" or "ps1", game =
 the ROM file name without its extension): one folder per game.  A game's
 folder is only created when it first writes a save.
 
@@ -17,7 +17,7 @@ import shutil
 from pathlib import Path
 
 _SAVE_DIR: Path | None = None
-CORES = ("gb", "gbc", "gba", "nes")       # one folder per console
+CORES = ("gb", "gbc", "gba", "nes", "ps1")       # one folder per console
 
 
 def set_save_dir(path) -> Path | None:

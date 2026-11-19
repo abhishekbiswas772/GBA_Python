@@ -34,3 +34,9 @@ rom/
 
 # battery saves: saves/<gb|gbc|gba|nes>/<game>/<game>.sav
 saves/
+
+# Rust build output (PS1 core)
+target/
+src/core/ps1/_ps1*.pyd
+src/core/ps1/_ps1*.so
+src/core/ps1/_ps1*.old.*

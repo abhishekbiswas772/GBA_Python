@@ -30,7 +30,7 @@ def _nes_rom(path: Path) -> Path:
 
 
 def test_console_folders_created(save_root):
-    assert sorted(p.name for p in save_root.iterdir()) == ["gb", "gba", "gbc", "nes"]
+    assert sorted(p.name for p in save_root.iterdir()) == ["gb", "gba", "gbc", "nes", "ps1"]
 
 
 def test_default_is_next_to_rom(tmp_path):

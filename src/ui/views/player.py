@@ -17,7 +17,7 @@ from src.ui.theme.tokens import OVERLAY_BG, OVERLAY_SUB, OVERLAY_TEXT, SCREEN_LA
 if TYPE_CHECKING:
     from src.ui.app import App
 
-NATIVE = {"GB": (160, 144), "GBC": (160, 144), "GBA": (240, 160), "NES": (256, 240)}
+NATIVE = {"GB": (160, 144), "GBC": (160, 144), "GBA": (240, 160), "NES": (256, 240), "PS1": (320, 240)}
 VISIBLE_SLOTS = (1, 2, 3, 4)          # slot 0 is the resume point saved when you leave
 
 
@@ -565,7 +565,7 @@ def _touch_pad(app: "App") -> ft.Control:
     ], spacing=14, tight=True, vertical_alignment=ft.CrossAxisAlignment.START)
     start_select = ft.Row([key("SELECT", "Select", 72), key("START", "Start", 72)], spacing=12, tight=True)
     rows = []
-    if s.game.system == "GBA":                 # shoulder buttons only exist on GBA
+    if s.game.system in ("GBA", "PS1"):        # shoulder buttons: GBA L/R, PS1 L1/R1
         rows.append(ft.Row([key("L", "L", 60, True), key("R", "R", 60, True)],
                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN, spacing=0, tight=True))
     rows += [

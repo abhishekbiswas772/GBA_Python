@@ -63,6 +63,8 @@ def build(app: "App") -> ft.Control:
         content = _audio(app)
     elif section == "Paths & saves":
         content = _paths(app)
+    elif section == "BIOS & firmware":
+        content = _bios(app)
     else:
         content = [
             c.heading(section, t, 28),
@@ -171,7 +173,8 @@ def _controls(app: "App") -> list[ft.Control]:
                           t, bg=t.panel, item_pad=16)
     system = ui.settings_system if ui.settings_system in SYSTEMS else "GBA"
     if kb:
-        names = {"GB": "Game Boy", "GBC": "Game Boy Color", "GBA": "Game Boy Advance", "NES": "NES"}
+        names = {"GB": "Game Boy", "GBC": "Game Boy Color", "GBA": "Game Boy Advance", "NES": "NES",
+                 "PS1": "PlayStation"}
         systems = c.segmented([(s, names[s]) for s in SYSTEMS], system,
                               lambda v: (setattr(ui, "settings_system", v), setattr(ui, "listening", None),
                                          app.render()), t, bg=t.panel, item_pad=14)
@@ -205,7 +208,7 @@ def _controls(app: "App") -> list[ft.Control]:
     for i, btn in enumerate(shown):
         keys = ui.draft_keyboards[system][btn] if kb else GAMEPAD_LAYOUT[btn]
         name = ft.Row([c.text(btn, color=t.text)] + (
-            [c.pill("GBA", "#232A45" if t.key != "daylight" else t.soft,
+            [c.pill("GBA · PS1", "#232A45" if t.key != "daylight" else t.soft,
                     "#B7C3FF" if t.key != "daylight" else t.accent, size=10, radius=4, padding=c.pad(6, 2))]
             if btn in GBA_ONLY and not kb else []), spacing=10)
         rows.append(ft.Container(ft.Row([
@@ -306,7 +309,8 @@ def _paths(app: "App") -> list[ft.Control]:
         rows.append(c.card(ft.Row([
             c.icon(ft.Icons.FOLDER_OPEN, t.muted, 18),
             ft.Column([c.mono(d, size=13, color=t.text),
-                       c.text("Scanned for .gb, .gbc, .gba and .nes files" if exists else "Folder not found",
+                       c.text("Scanned for .gb, .gbc, .gba, .nes and PS-X .exe files" if exists
+                              else "Folder not found",
                               size=12, color=t.muted)], spacing=2, tight=True, expand=True),
             c.icon_button(ft.Icons.CLOSE, lambda e, p=d: remove(p), t, "Remove folder"),
         ], spacing=12), t, padding=c.pad(14, 10), radius=12))
@@ -353,3 +357,46 @@ def _pad_status() -> str:
         return "No controller connected. Plug one in; this is the standard layout."
     return "Connected: " + ", ".join(names) + ". Standard layout:"
 
+
+
+# -------------------------------------------------------------------- BIOS
+def _bios(app: "App") -> list[ft.Control]:
+    t, s = app.t, app.settings
+    from src.core import ps1
+
+    async def pick(e) -> None:
+        if app.is_web or app.is_mobile:
+            app.toast("Picking a BIOS file needs the desktop app.")
+            return
+        files = await ft.FilePicker().pick_files(dialog_title="Choose a PS1 BIOS image", allow_multiple=False)
+        if files:
+            s.ps1_bios = files[0].path or ""
+            s.save()
+            app.render()
+
+    def clear(e) -> None:
+        s.ps1_bios = ""
+        s.save()
+        app.render()
+
+    have = bool(s.ps1_bios) and Path(s.ps1_bios).is_file()
+    core_line = (f"PS1 core {ps1.VERSION} is built." if ps1.AVAILABLE else
+                 "The PS1 core isn't built yet: run  uv run python -m src.core.ps1.build  (needs Rust).")
+    return [
+        ft.Column([c.heading("BIOS & firmware", t, 28),
+                   c.text("Game Boy, Color, GBA and NES need no BIOS. The GBA uses a built-in HLE BIOS.",
+                          color=t.muted)], spacing=6),
+        c.eyebrow("PlayStation (experimental)", t),
+        c.text(core_line, size=13, color=t.text if ps1.AVAILABLE else t.muted),
+        c.card(ft.Row([
+            c.icon(ft.Icons.MEMORY, t.muted, 18),
+            ft.Column([c.mono(s.ps1_bios or "No BIOS selected", size=13, color=t.text),
+                       c.text("Used to boot. Without one, PS-X EXE programs run on the built-in HLE kernel."
+                              if not have else "Programs start through this BIOS.", size=12, color=t.muted)],
+                      spacing=2, tight=True, expand=True),
+        ], spacing=12), t, padding=c.pad(14, 10), radius=12),
+        ft.Row([c.button("Choose BIOS file", pick, t, variant="primary", icon_name=ft.Icons.FILE_OPEN),
+                c.button("Use the HLE kernel", clear, t, disabled=not s.ps1_bios)], spacing=10, wrap=True),
+        c.text("A BIOS is copyrighted Sony firmware: dump it from your own console. It is never shipped "
+               "or downloaded by this app.", size=12, color=t.muted),
+    ]

@@ -32,7 +32,7 @@ splash_color = "#0F1115"
 
 [tool.flet.app]
 module = "main.py"
-exclude = ["tests", "rom", "src/rom", "docs"]
+exclude = ["tests", "rom", "src/rom", "docs", "src/core/ps1/native/target"]
 
 [tool.flet.windows]
 dependencies = ["pygame>=2.6.1"]

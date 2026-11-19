@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 ROM_DIR = ROOT / "rom"
-ROM_SUBDIRS = ("gb", "gb_color", "gba", "nes")
+ROM_SUBDIRS = ("gb", "gb_color", "gba", "nes", "ps1")
 COMMANDS = ("app", "play", "run", "info")
 
 KEYS_HELP = (
@@ -60,7 +60,7 @@ def ensure_rom_dir() -> Path:
     for sub in ROM_SUBDIRS:
         (ROM_DIR / sub).mkdir(parents=True, exist_ok=True)
     if created:
-        print(f"[created ROM folder {ROM_DIR} - put your .gb / .gbc / .gba / .nes files in it]")
+        print(f"[created ROM folder {ROM_DIR} - put your .gb / .gbc / .gba / .nes / PS-X .exe files in it]")
     return ROM_DIR
 
 

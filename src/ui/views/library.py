@@ -16,7 +16,8 @@ if TYPE_CHECKING:
 
 _search_ref: ft.Ref[ft.TextField] = ft.Ref()
 
-FILTERS = [("all", "All games"), ("GB", "Game Boy"), ("GBC", "Game Boy Color"), ("GBA", "Game Boy Advance"), ("NES", "NES")]
+FILTERS = [("all", "All games"), ("GB", "Game Boy"), ("GBC", "Game Boy Color"), ("GBA", "Game Boy Advance"),
+           ("NES", "NES"), ("PS1", "PlayStation")]
 HEADINGS = {**dict(FILTERS), "fav": "Favorites"}
 SORTS = [("recent", "Last played"), ("title", "Title A–Z"), ("system", "System")]
 
@@ -45,7 +46,7 @@ def build(app: "App") -> ft.Control:
             return
         files = await ft.FilePicker().pick_files(
             dialog_title="Add ROMs", allow_multiple=True, file_type=ft.FilePickerFileType.CUSTOM,
-            allowed_extensions=["gb", "gbc", "cgb", "gba", "agb", "nes"])
+            allowed_extensions=["gb", "gbc", "cgb", "gba", "agb", "nes", "exe", "psx"])
         paths = [f.path for f in files or [] if f.path]
         if not paths:
             return
@@ -69,7 +70,7 @@ def build(app: "App") -> ft.Control:
             return str(len(app.games))
         return str(sum(1 for g in app.games if g.system == f))
 
-    dot_color = {"all": t.text, "GB": t.gb, "GBC": t.gbc, "GBA": t.gba, "NES": t.nes}
+    dot_color = {"all": t.text, "GB": t.gb, "GBC": t.gbc, "GBA": t.gba, "NES": t.nes, "PS1": t.ps1}
     nav = [c.eyebrow("Library", t)] + [
         c.nav_item(t, label, (lambda e, k=key: set_filter(k)), lead=c.dot(dot_color[key], 8, 2),
                    trailing=c.mono(count(key), t), selected=ui.lib_filter == key)

@@ -13,13 +13,14 @@ from pathlib import Path
 
 # Console buttons in the order the Controls table shows them.
 CONSOLE_BUTTONS = ["Up", "Down", "Left", "Right", "A", "B", "L", "R", "Start", "Select"]
-GBA_ONLY = {"L", "R"}
-SYSTEMS = ("GB", "GBC", "GBA", "NES")
+GBA_ONLY = {"L", "R"}                       # shoulder buttons (L1 / R1 on the PS1)
+SYSTEMS = ("GB", "GBC", "GBA", "NES", "PS1")
+SHOULDER_SYSTEMS = {"GBA", "PS1"}
 
 
 def buttons_for(system: str) -> list[str]:
-    """Console buttons that exist on `system` (shoulder buttons only on GBA)."""
-    return [b for b in CONSOLE_BUTTONS if system == "GBA" or b not in GBA_ONLY]
+    """Console buttons that exist on `system` (shoulder buttons only on GBA and PS1)."""
+    return [b for b in CONSOLE_BUTTONS if system in SHOULDER_SYSTEMS or b not in GBA_ONLY]
 
 
 # Game Boy / Game Boy Color: d-pad on arrows or WASD, A/B on K/J (or X/Z).
@@ -44,6 +45,7 @@ DEFAULT_KEYBOARD_GBA: dict[str, list[str]] = {
 DEFAULT_KEYBOARDS: dict[str, dict[str, list[str]]] = {
     "GB": DEFAULT_KEYBOARD_GB, "GBC": DEFAULT_KEYBOARD_GB, "GBA": DEFAULT_KEYBOARD_GBA,
     "NES": DEFAULT_KEYBOARD_GB,
+    "PS1": DEFAULT_KEYBOARD_GBA,          # A = ✕, B = ○, L/R = L1/R1
 }
 DEFAULT_KEYBOARD = DEFAULT_KEYBOARD_GBA        # legacy name (one layout for every system)
 
@@ -108,6 +110,7 @@ class Settings:
     frame_blend: bool = False
     volume: int = 70
     replay_buffer: bool = True
+    ps1_bios: str = ""                   # optional PS1 BIOS image (scph*.bin)
     record_format: str = "mp4"          # mp4 (video + sound) | gif (silent)
     rom_dirs: list[str] = field(default_factory=lambda: [str(Path.home() / "Games" / "ROMs")])
     extra_roms: list[str] = field(default_factory=list)
@@ -146,7 +149,7 @@ class Settings:
             # one shared layout from older versions: start every system from it
             for sysname in SYSTEMS:
                 s.keyboards[sysname] = {b: list(legacy.get(b, d)) for b, d in DEFAULT_KEYBOARDS[sysname].items()}
-                if sysname != "GBA":
+                if sysname not in SHOULDER_SYSTEMS:
                     for b in GBA_ONLY:
                         s.keyboards[sysname][b] = ["", ""]
         s.keyboards = s._clean_keyboards(s.keyboards)
@@ -186,7 +189,7 @@ class Settings:
         return set_save_dir(self.save_folder())
 
     def keyboard_for(self, system: str) -> dict[str, list[str]]:
-        """Key layout used while playing `system` ("GB", "GBC", "GBA" or "NES")."""
+        """Key layout used while playing `system` ("GB", "GBC", "GBA", "NES" or "PS1")."""
         m = self.keyboards.get(system) or self.keyboards.get("GBA") or DEFAULT_KEYBOARD_GBA
         allowed = set(buttons_for(system))
         return {b: list(k) for b, k in m.items() if b in allowed}

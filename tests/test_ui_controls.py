@@ -17,7 +17,7 @@ def data_dir(tmp_path, monkeypatch):
 
 def test_defaults_are_per_system(data_dir):
     s = st.Settings.load()
-    assert set(s.keyboards) == {"GB", "GBC", "GBA", "NES"}
+    assert set(s.keyboards) == {"GB", "GBC", "GBA", "NES", "PS1"}
     assert "L" not in s.keyboard_for("GB") and "R" not in s.keyboard_for("GBC")
     assert s.keyboard_for("GBA")["L"][0] == "Q"
     assert s.hotkeys["fast_forward"] != "Tab"
