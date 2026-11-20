@@ -291,7 +291,7 @@ def _play_options(p: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        prog="main.py", description="Game Boy / Game Boy Color / Game Boy Advance emulator.",
+        prog="retropy", description="RetroPy: Game Boy, Game Boy Color, Game Boy Advance, NES and (experimental) PS1 emulator.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="With no command the desktop app opens.\n\n" + KEYS_HELP)
     sub = ap.add_subparsers(dest="command")

@@ -14,9 +14,15 @@ Thanks for wanting to help. This project emulates the Game Boy, Game Boy Color, 
 ```bash
 git clone https://github.com/abhishekbiswas772/RetroPy.git
 cd RetroPy
-uv sync                      # Python 3.13+, installs Flet, pygame and pytest
+uv sync                      # Python 3.13+, installs Flet, pygame, pytest and the `retropy` command
 uv run python main.py        # the desktop app
+uv run python -m src.core.ps1.build   # optional: the PS1 core (needs Rust, https://rustup.rs)
 ```
+
+The same CLI runs any of these ways: `uv run python main.py`, `uv run retropy`,
+`uv run python -m src`, or `retropy` after `uv tool install .` / `pip install .`.
+With no arguments it opens the desktop app; `retropy play <rom>`, `retropy run <rom>`
+and `retropy info <rom>` work as before.
 
 ## Before you open a pull request
 
@@ -75,6 +81,18 @@ The cores run inside the CPython interpreter, so a few habits matter:
 - Cache rendered rows and tiles. Use `bytes.translate` and slice assignment instead of per-pixel loops.
 - `run_frame(render=False)` must stay cheap and must still behave exactly the same as a drawn frame.
 - Measure before and after with `uv run python docs/make_media.py` or `main.py run <rom> --frames 600`, and put the numbers in your PR.
+
+## Branch protection
+
+`main` is protected:
+
+- changes land through a pull request (no approval count is required, but review comments must be resolved);
+- the CI checks **Checks (Linux)**, **Unit tests (Linux)**, **Unit tests (Windows)** and **Test ROMs (Linux)** must pass, on a branch that is up to date with `main`;
+- history stays linear: rebase or squash-merge, no merge commits;
+- force pushes and deleting `main` are blocked.
+
+So work on a branch in your fork, open a PR against `main`, and rebase onto `main` if it moved.
+Maintainers can bypass the rules for urgent fixes; everyone else, including bots, goes through a PR.
 
 ## Commits and pull requests
 

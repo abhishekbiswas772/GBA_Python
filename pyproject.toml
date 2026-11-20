@@ -15,6 +15,20 @@ dependencies = [
     "pillow>=11",          # GIFs, video frames (src/bridge/recorder)
 ]
 
+# Run it as `python main.py`, `uv run retropy`, `python -m src`, or `retropy` after
+# `pip install .` / `uv tool install .` (same CLI: no arguments opens the desktop app).
+[project.scripts]
+retropy = "main:main"
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["src", "main.py"]
+exclude = ["src/rom", "src/core/ps1/native"]
+dev-mode-dirs = ["."]
+
 # pygame has no Android wheel. Desktop builds opt in below; `uv sync` still
 # installs it through the dev group so tests and `python main.py` keep sound.
 [dependency-groups]
@@ -49,7 +63,7 @@ target_arch = ["arm64-v8a", "armeabi-v7a", "x86_64"]
 split_per_abi = true
 
 [tool.uv]
-package = false          # an application: run with `python main.py`, nothing to build
+package = true           # installs the `retropy` command; `python main.py` works as before
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
