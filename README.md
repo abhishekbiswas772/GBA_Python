@@ -212,7 +212,8 @@ Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest fi
 | Recording and clip of the last 30 s, as MP4 with sound or GIF | ✅ |
 | PlayStation: PS-X EXE programs (CPU, GPU, DMA, timers, pad) | 🧪 experimental, Rust core |
 | PlayStation: save states and rewind | ✅ |
-| PlayStation: CD games, 3D (GTE), sound (SPU), memory cards | 🚧 next milestones |
+| PlayStation: 3D maths (GTE) | ✅ |
+| PlayStation: CD games, sound (SPU), memory cards | 🚧 next milestones |
 | Cheats, achievements, link play | 🚧 UI preview, not in the cores yet |
 
 ---
@@ -250,7 +251,7 @@ Without that step the rest of the app is unchanged. PS1 games show up in the lib
 | Boot with your own BIOS (**Settings → BIOS & firmware**), EXE sideloaded at the shell | ⚠️ implemented, not yet tested against a real BIOS |
 | Save states, resume point and rewind | ✅ the Rust core serializes itself (serde + bincode, ~3.6 MB raw, ~90 KB compressed); replay after a load is bit-identical |
 | CD-ROM (`.cue` / `.bin`) | 🚧 milestone 2 |
-| GTE (3D maths coprocessor) | 🚧 milestone 3: registers only, commands are stubs |
+| GTE (3D maths coprocessor): all 22 commands, 44-bit MACs, flags, UNR division | ✅ 1,100/1,100 hardware fuzz cases, `gte/test-all` 1150/1150 |
 | SPU (sound) | 🚧 milestone 4: registers and RAM only, output is silence |
 | Memory cards, MDEC (video) | 🚧 later |
 
@@ -263,7 +264,7 @@ Without that step the rest of the app is unchanged. PS1 games show up in the lib
 | `gpu/triangle` | ✅ within one 5-bit step on Gouraud colours (0.4% of pixels round differently) |
 | `gpu/clut-cache`, `gpu/lines`, `gpu/texture-flip`, `gpu/uv-interpolation` (not bundled) | 98.8–99.9% of pixels |
 | `cpu/access-time`, `dma/chopping`, `dma/chain-looping`, `gpu/bandwidth` | ❌ memory wait states and DMA timing aren't modelled yet |
-| `gte/*` | ❌ needs the GTE |
+| `gte/test-all` (1,150 checks) and `gte-fuzz` (1,100 commands, all 64 registers compared) | ✅ identical to the console |
 
 **Speed.** About 220–250 emulated frames per second on the bundled tests (roughly 4× real time), measured on a laptop, including frame copies to Python.
 
@@ -521,7 +522,7 @@ Push a tag like `v0.2.0` and GitHub Actions builds both apps and publishes them 
 ## 🧭 Honest limits
 
 - Cheats, achievements and link play are UI previews for now; the cores don't implement them yet.
-- The PS1 core is experimental: PS-X EXE programs only, no sound and no 3D maths yet. Booting through a real BIOS is implemented but untested. CI and packaged builds don't compile it yet, so it is available when you build from source.
+- The PS1 core is experimental: PS-X EXE programs only, no sound yet. Booting through a real BIOS is implemented but untested. CI and packaged builds don't compile it yet, so it is available when you build from source.
 - Sound uses SDL through pygame, so it works in the desktop app only.
 - The NES core is NTSC only. PAL and mappers beyond the ones listed above are welcome contributions.
 

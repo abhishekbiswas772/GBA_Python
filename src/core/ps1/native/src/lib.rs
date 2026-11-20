@@ -30,6 +30,22 @@ mod python {
         sys: System,
     }
 
+    /// Run one GTE command on a fresh GTE: `regs` = 64 values written in order
+    /// (data 0..31 with MTC2, then control 0..31 with CTC2); returns the 64 registers
+    /// read back with MFC2 / CFC2. For tests against hardware logs.
+    #[pyfunction]
+    pub fn gte_exec(regs: Vec<u32>, op: u32) -> PyResult<Vec<u32>> {
+        if regs.len() != 64 {
+            return Err(PyValueError::new_err("need 64 register values"));
+        }
+        let mut g = crate::gte::Gte::default();
+        for (r, &v) in regs.iter().enumerate() {
+            if r < 32 { g.write_data(r, v) } else { g.write_ctrl(r - 32, v) }
+        }
+        g.command(op);
+        Ok((0..64).map(|r| if r < 32 { g.read_data(r) } else { g.read_ctrl(r - 32) }).collect())
+    }
+
     #[pymethods]
     impl Ps1 {
         #[new]
@@ -182,6 +198,7 @@ mod python {
         m.add("VERSION", env!("CARGO_PKG_VERSION"))?;
         m.add("SAMPLE_RATE", super::system::SAMPLE_RATE)?;
         m.add_class::<Ps1>()?;
+        m.add_function(wrap_pyfunction!(gte_exec, m)?)?;
         Ok(())
     }
 }

@@ -24,14 +24,14 @@ def test_core_built_when_required():
     if os.environ.get("PS1_CORE_REQUIRED") and not ps1.AVAILABLE:
         pytest.fail(f"PS1 core missing: {ps1.IMPORT_ERROR}")
 
-LOG_TESTS = ["cop", "code-in-io", "dpcr", "otc-test", "gp0-e1", "mask-bit"]
+LOG_TESTS = ["cop", "code-in-io", "dpcr", "otc-test", "gp0-e1", "mask-bit", "test-all"]
 VRAM_TESTS = ["rectangles", "triangle", "transparency", "quad"]
 # the bundled otc-test.exe is a newer build than its psx.log: it runs two more
 # sub-tests, so its log is checked as "every console line appears, in order"
-NEWER_THAN_LOG = {"otc-test"}
+NEWER_THAN_LOG = {"otc-test", "test-all"}
 
 
-def _run(name: str, frames: int = 240):
+def _run(name: str, frames: int = 1500):
     m = ps1.Ps1(exe=(ROMS / name / f"{name}.exe").read_bytes())
     tty = bytearray()
     for _ in range(frames):
@@ -210,3 +210,24 @@ def test_audio_follows_a_loaded_state(tmp_path):
     m.apu.take_samples()
     m.run_frame()
     assert m.apu.sampling and len(m.apu.take_samples()) > 1000     # the new core is the one heard
+
+
+@needs_core
+def test_gte_matches_hardware_fuzz_log():
+    """1,100 GTE commands (22 opcodes x 50 random register sets) against a real console:
+    every one of the 64 registers must read back as on hardware."""
+    import re
+    from src.core.ps1._ps1 import gte_exec
+    text = (ROMS / "gte-fuzz" / "gte_valid_0xc0ffee_50.log").read_text()
+    cases = re.findall(
+        r"Test \d+\n((?:> r\[\d+\] = 0x[0-9a-f]+\n)+)GTE (0x[0-9a-f]+) (\w+) "
+        r"\(sf=(\d), lm=(\d), tx=(\d), vx=(\d), mx=(\d)\)\n((?:< r\[\d+\] = 0x[0-9a-f]+\n)+)", text)
+    assert len(cases) == 1100
+    bad = []
+    for ins, op, name, sf, lm, tx, vx, mx, outs in cases:
+        regs = [int(x, 16) for x in re.findall(r"= (0x[0-9a-f]+)", ins)]
+        want = [int(x, 16) for x in re.findall(r"= (0x[0-9a-f]+)", outs)]
+        word = (int(op, 16) | int(sf) << 19 | int(lm) << 10 | int(tx) << 13 | int(vx) << 15 | int(mx) << 17)
+        if gte_exec(regs, word) != want:
+            bad.append(name)
+    assert not bad, f"{len(bad)} GTE commands differ: {sorted(set(bad))}"
