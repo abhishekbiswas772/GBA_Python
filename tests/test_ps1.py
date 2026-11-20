@@ -304,3 +304,101 @@ def test_spu_decode_matches_an_independent_decoder():
 
     best = max(corr(ref, left[start + d:start + d + len(ref)]) for d in range(-4, 6) if start + d >= 0)
     assert best > 0.99, best
+
+
+# ------------------------------------------------------------------ CD-ROM
+def _disc(tmp_path, exe: bytes, boot: str = "TEST.EXE", sectors: int = 600) -> Path:
+    """A one-track MODE2/2352 test disc: SYSTEM.CNF booting `exe`, as a .cue + .bin."""
+    cnf = f"BOOT = cdrom:\\{boot};1\r\nTCB = 4\r\nEVENT = 10\r\nSTACK = 801FFF00\r\n".encode()
+    img = bytes(ps1.make_disc_image([("SYSTEM.CNF", cnf), (boot, exe)], sectors))
+    (tmp_path / "disc.bin").write_bytes(img)
+    cue = tmp_path / "disc.cue"
+    cue.write_text('FILE "disc.bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n')
+    return cue
+
+
+@needs_core
+def test_disc_boots_through_system_cnf(tmp_path):
+    """No BIOS: the HLE kernel finds the boot file through ISO9660 and SYSTEM.CNF."""
+    cue = _disc(tmp_path, (ROMS / "cop" / "cop.exe").read_bytes())
+    m = ps1.Ps1(disc=str(cue))
+    tty = bytearray()
+    for _ in range(1500):
+        m.run_frame()
+        tty += m.take_tty()
+        if b"Done" in tty:
+            break
+    assert _lines(tty.decode("latin-1")) == _lines((ROMS / "cop" / "psx.log").read_text(encoding="latin-1"))
+    assert m.hle_unknown() == []
+
+
+def _timings(text: str) -> dict[str, list[int]]:
+    """Every '<name> = N ticks' / 'min N max N avg N' number of the timing test, by name."""
+    import re
+    out: dict[str, list[int]] = {}
+    for line in text.splitlines():
+        if m := re.match(r"(init ack|init complete|Cdl\w+): min (\d+), max (\d+), average (\d+)", line):
+            out.setdefault(m[1], []).extend(int(m[i]) for i in (2, 3, 4))
+        if m := re.match(r"(single|double)-speed timing: (.*)", line):
+            for k, lo, hi, v in re.findall(r"([A-Za-z ]+?) = (?:min (\d+) max (\d+) avg )?(\d+)", m[2]):
+                out.setdefault(f"{m[1]} {k.strip(', ')}", []).extend(int(x) for x in (lo, hi, v) if x)
+    return out
+
+
+@needs_core
+def test_cdrom_timing_within_hardware_ranges(tmp_path):
+    """cdrom/timing measures command acks, seeks and sector periods with a timer; every
+    average the core produces must fall inside what five runs on a real console spanned
+    (per-sector periods: the min..max the console printed; the core keeps the nominal
+    CPU clock / 75, which DuckStation also uses)."""
+    cue = _disc(tmp_path, (ROMS / "cdrom-timing" / "cdrom-timing.exe").read_bytes())
+    m = ps1.Ps1(disc=str(cue))
+    tty = bytearray()
+    for _ in range(3000):
+        m.run_frame()
+        tty += m.take_tty()
+        if tty.count(b"double-speed") >= 5:
+            break
+    got = _timings(tty.decode("latin-1"))
+    want = _timings((ROMS / "cdrom-timing" / "psx.log").read_text(encoding="latin-1"))
+    assert set(got) == set(want) and len(want) >= 15, (sorted(got), sorted(want))
+    for name, hw in want.items():
+        ours = got[name]
+        avg = sum(ours) / len(ours)
+        assert min(hw) <= avg <= max(hw), f"{name}: {avg:.0f} outside hardware {min(hw)}..{max(hw)}"
+
+
+def _core_print(m) -> bytes:
+    return m.core.ps1.vram() + bytes(m.core.ps1.save_state())
+
+
+@needs_core
+def test_disc_in_the_bridge_with_states(tmp_path):
+    from src.bridge import detect, load
+    from src.bridge import savestate as ss
+    cue = _disc(tmp_path, (ROMS / "cop" / "cop.exe").read_bytes())
+    assert detect(cue) == "PS1"
+    m = load(cue)
+    assert m.title_info.startswith("CD")
+    for _ in range(120):
+        m.run_frame()
+    snap = ss.capture(m)
+    before = _core_print(m)
+    for _ in range(30):
+        m.run_frame()
+    ss.restore(m, snap)
+    assert _core_print(m) == before
+    ss.save_file(m, tmp_path / "s.state")
+    other = load(cue)
+    ss.load_file(other, tmp_path / "s.state")
+    assert _core_print(other) == before
+    for _ in range(10):              # the reopened disc still reads
+        other.run_frame()
+
+
+@needs_core
+def test_commercial_disc_without_bios_says_so(tmp_path):
+    from src.bridge import load
+    cue = _disc(tmp_path, (ROMS / "cop" / "cop.exe").read_bytes(), boot="SLUS_123.45")
+    with pytest.raises(ValueError, match="BIOS"):
+        load(cue)

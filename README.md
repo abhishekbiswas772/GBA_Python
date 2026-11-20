@@ -50,7 +50,7 @@
 <p align="center">
   <sub>Every frame above is drawn by this emulator, from the author's own cartridge dumps, played headlessly with scripted button presses.
   No game is included in this repository. With your own dumps in <code>rom/</code>, regenerate the media with <code>uv run python docs/make_game_media.py</code>.
-  PlayStation is left out because CD-ROM games don't run yet.</sub>
+  PlayStation is left out because commercial discs aren't verified yet.</sub>
 </p>
 
 ---
@@ -223,7 +223,8 @@ Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest fi
 | PlayStation: PS-X EXE programs (CPU, GPU, DMA, timers, pad) | 🧪 experimental, Rust core |
 | PlayStation: save states and rewind | ✅ |
 | PlayStation: 3D maths (GTE) | ✅ |
-| PlayStation: CD games, memory cards | 🚧 next milestones |
+| PlayStation: CD images (`.cue` / `.iso`) | 🧪 homebrew discs run without a BIOS; commercial discs need your BIOS |
+| PlayStation: memory cards | 🚧 next milestone |
 | Cheats, achievements, link play | 🚧 UI preview, not in the cores yet |
 
 ---
@@ -249,7 +250,7 @@ uv run python main.py run tests/roms/ps1/gp0-e1/gp0-e1.exe     # headless, print
 
 Without that step the rest of the app is unchanged. PS1 games show up in the library, and opening one says how to build the core.
 
-**What runs today: PS-X EXE programs** (`.exe` / `.psx` files starting with `PS-X EXE`). Homebrew and test programs work; commercial games need the CD-ROM milestone. Windows `.exe` files in a ROM folder are ignored, because only the PS-X header counts.
+**What runs today: PS-X EXE programs** (`.exe` / `.psx` files starting with `PS-X EXE`) **and CD images** (`.cue` sheets with their `.bin` tracks, or `.iso`). Without a BIOS the HLE kernel boots a disc's `SYSTEM.CNF` program, which is enough for homebrew and test discs. Commercial games use far more of the BIOS than the HLE kernel covers, so the app asks for your own BIOS dump when you open one. Windows `.exe` files in a ROM folder are ignored, because only the PS-X header counts.
 
 | Part | Status |
 |---|---|
@@ -260,13 +261,13 @@ Without that step the rest of the app is unchanged. PS1 games show up in the lib
 | Boot without a BIOS: a small HLE kernel (exceptions, events, TTY, `printf`, pads) | ✅ runs every bundled test |
 | Boot with your own BIOS (**Settings → BIOS & firmware**), EXE sideloaded at the shell | ⚠️ implemented, not yet tested against a real BIOS |
 | Save states, resume point and rewind | ✅ the Rust core serializes itself (serde + bincode, ~3.6 MB raw, ~90 KB compressed); replay after a load is bit-identical |
-| CD-ROM (`.cue` / `.bin`) | 🚧 milestone 2 |
+| CD-ROM: `.cue` (multi-file, pregaps), `.iso`; ISO9660 + `SYSTEM.CNF` boot; all controller commands, data reads at 1×/2×, CD-DA audio, report mode | ✅ `cdrom/timing` inside the hardware ranges (acks, seeks, sector periods, pause). XA-ADPCM audio sectors are skipped for now. |
 | GTE (3D maths coprocessor): all 22 commands, 44-bit MACs, flags, UNR division | ✅ 1,100/1,100 hardware fuzz cases, `gte/test-all` 1150/1150 |
 | SPU (sound): 24 ADPCM voices, ADSR, sweeps, pitch modulation, noise, Gaussian interpolation, reverb, IRQ | ✅ `spu/memory-transfer` matches a console (incl. DMA timing); voice output correlates 0.999 with an independent decoder. No console recording to compare playback against. |
 | MDEC (FMV decoder): RLE, IDCT, YUV→RGB, 4/8/15/24-bit, CPU and DMA | ✅ mono output exact; colour within one 5-bit step |
 | Memory cards | 🚧 later |
 
-**Accuracy.** Checked against real-console output from [JaCzekanski's ps1-tests](https://github.com/JaCzekanski/ps1-tests) (MIT). Ten of them are bundled in `tests/roms/ps1` with their hardware logs and VRAM dumps:
+**Accuracy.** Checked against real-console output from [JaCzekanski's ps1-tests](https://github.com/JaCzekanski/ps1-tests) (MIT). Eighteen of them are bundled in `tests/roms/ps1` with their hardware logs and VRAM dumps:
 
 | Test | Result |
 |---|---|
@@ -543,7 +544,7 @@ Push a tag like `v0.2.0` and GitHub Actions builds both apps and publishes them 
 ## 🧭 Honest limits
 
 - Cheats, achievements and link play are UI previews for now; the cores don't implement them yet.
-- The PS1 core is experimental: PS-X EXE programs only. Booting through a real BIOS is implemented but untested. CI builds and tests it, and the release installers include it.
+- The PS1 core is experimental. PS-X EXEs and homebrew discs run without a BIOS; commercial discs need a BIOS, and booting through a real BIOS is implemented but untested. XA-ADPCM (streamed CD audio) and memory cards aren't done yet. CI builds and tests it, and the release installers include it.
 - Sound uses SDL through pygame, so it works in the desktop app only.
 - The NES core is NTSC only. PAL and mappers beyond the ones listed above are welcome contributions.
 

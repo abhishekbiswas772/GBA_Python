@@ -1,13 +1,13 @@
 //! Experimental PlayStation (PS1) core for RetroPy.
 //!
-//! Status: milestone 1. Done: CPU, bus, DMA, timers, IRQs, GPU rasterizer,
-//! digital pad, PS-X EXE loading, an HLE kernel, and BIOS booting.
-//! Still to come: CD-ROM reading (milestone 2), the GTE commands (3),
-//! SPU voices (4), memory cards (5), MDEC (6) and save states (7).
+//! Status: CPU, bus, DMA, timers, IRQs, GPU, GTE, SPU, MDEC, CD-ROM, pad,
+//! PS-X EXE and disc booting (HLE kernel or a real BIOS), save states.
+//! Still to come: XA-ADPCM audio and memory cards.
 
 pub mod bus;
 pub mod cdrom;
 pub mod cpu;
+pub mod disc;
 pub mod gpu;
 pub mod gte;
 pub mod hle;
@@ -48,12 +48,32 @@ mod python {
         Ok((0..64).map(|r| if r < 32 { g.read_data(r) } else { g.read_ctrl(r - 32) }).collect())
     }
 
+    /// A raw (2352-byte sector) ISO9660 data disc holding `files` in its root, licensed
+    /// as SCEA: for tests and homebrew. Write it as a .bin next to a one-track .cue.
+    #[pyfunction]
+    pub fn make_disc_image(files: Vec<(String, Vec<u8>)>, sectors: u32) -> Vec<u8> {
+        let refs: Vec<(&str, &[u8])> = files.iter().map(|(n, d)| (n.as_str(), d.as_slice())).collect();
+        crate::disc::build_iso(&refs, sectors)
+    }
+
     #[pymethods]
     impl Ps1 {
         #[new]
-        #[pyo3(signature = (bios=None, exe=None))]
-        fn new(bios: Option<Vec<u8>>, exe: Option<Vec<u8>>) -> PyResult<Self> {
-            System::new(bios, exe).map(|sys| Ps1 { sys }).map_err(PyValueError::new_err)
+        #[pyo3(signature = (bios=None, exe=None, disc=None))]
+        fn new(bios: Option<Vec<u8>>, exe: Option<Vec<u8>>, disc: Option<std::path::PathBuf>) -> PyResult<Self> {
+            let disc = match disc {
+                Some(p) => Some(std::sync::Arc::new(crate::disc::Disc::open(&p).map_err(PyValueError::new_err)?)),
+                None => None,
+            };
+            System::with_disc(bios, exe, disc).map(|sys| Ps1 { sys }).map_err(PyValueError::new_err)
+        }
+
+        /// A short id of the disc in the drive (its SYSTEM.CNF and volume name), or None.
+        fn disc_id<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyBytes>> {
+            let d = self.sys.bus.cdrom.disc()?;
+            let mut id = d.user_data(16)[40..72].to_vec();
+            id.extend(d.read_file("SYSTEM.CNF").unwrap_or_default());
+            Some(PyBytes::new(py, &id))
         }
 
         /// Machine state as bytes (no BIOS inside).
@@ -206,6 +226,7 @@ mod python {
         m.add("SAMPLE_RATE", super::system::SAMPLE_RATE)?;
         m.add_class::<Ps1>()?;
         m.add_function(wrap_pyfunction!(gte_exec, m)?)?;
+        m.add_function(wrap_pyfunction!(make_disc_image, m)?)?;
         Ok(())
     }
 }

@@ -46,7 +46,7 @@ def build(app: "App") -> ft.Control:
             return
         files = await ft.FilePicker().pick_files(
             dialog_title="Add ROMs", allow_multiple=True, file_type=ft.FilePickerFileType.CUSTOM,
-            allowed_extensions=["gb", "gbc", "cgb", "gba", "agb", "nes", "exe", "psx"])
+            allowed_extensions=["gb", "gbc", "cgb", "gba", "agb", "nes", "exe", "psx", "cue", "iso"])
         paths = [f.path for f in files or [] if f.path]
         if not paths:
             return

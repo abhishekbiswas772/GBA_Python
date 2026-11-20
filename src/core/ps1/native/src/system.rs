@@ -2,14 +2,16 @@
 
 use crate::bus::{irq, Bus};
 use crate::cpu::Cpu;
+use crate::disc::Disc;
 use crate::hle::Hle;
+use std::sync::Arc;
 
 pub const CPU_HZ: u32 = 33_868_800;
 pub const SAMPLE_RATE: u32 = 44_100;
 const BATCH: u32 = 64; // cycles between device updates
 const SHELL_ENTRY: u32 = 0x8003_0000;
 /// Bumped whenever the state layout changes (a state from another layout is refused).
-const STATE_MAGIC: &[u8] = b"PS1STATE\x02";
+const STATE_MAGIC: &[u8] = b"PS1STATE\x03";
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Exe {
@@ -58,13 +60,23 @@ pub struct System {
 impl System {
     /// `bios`: a real BIOS image, or None for the built-in HLE kernel (EXEs only).
     pub fn new(bios: Option<Vec<u8>>, exe: Option<Vec<u8>>) -> Result<System, String> {
-        let exe = match exe {
+        Self::with_disc(bios, exe, None)
+    }
+
+    /// Boot with a disc in the drive. With a BIOS the BIOS boots it; without one the
+    /// HLE kernel loads the program named in the disc's SYSTEM.CNF (enough for homebrew
+    /// and test discs; commercial games need the BIOS).
+    pub fn with_disc(bios: Option<Vec<u8>>, exe: Option<Vec<u8>>, disc: Option<Arc<Disc>>) -> Result<System, String> {
+        let mut exe = match exe {
             Some(b) => Some(Exe::parse(&b)?),
             None => None,
         };
         let have_bios = bios.is_some();
         if !have_bios && exe.is_none() {
-            return Err("a PS1 BIOS is needed to boot discs; without one only PS-X EXE files run".into());
+            let Some(d) = disc.as_ref() else {
+                return Err("a PS1 BIOS is needed to boot discs; without one only PS-X EXE files run".into());
+            };
+            exe = Some(boot_exe_from_disc(d)?);
         }
         let mut s = System {
             cpu: Cpu::new(),
@@ -76,6 +88,9 @@ impl System {
             samples: Vec::new(),
             cycles: 0,
         };
+        if let Some(d) = disc {
+            s.bus.cdrom.insert(d);
+        }
         if !have_bios {
             s.boot_hle();
         }
@@ -123,6 +138,7 @@ impl System {
         let body = data.strip_prefix(STATE_MAGIC).ok_or("not a PS1 state (or from another core version)")?;
         let mut new: System = bincode::deserialize(body).map_err(|e| format!("bad PS1 state: {e}"))?;
         new.bus.bios = std::mem::take(&mut self.bus.bios);
+        new.bus.cdrom.attach(self.bus.cdrom.disc().cloned());
         new.sampling = self.sampling;
         *self = new;
         Ok(())
@@ -208,9 +224,42 @@ impl System {
         }
         bus.collect_gpu_irq();
         bus.tick_dma(cycles);
+        if !bus.cdrom.audio.is_empty() {
+            let a = std::mem::take(&mut bus.cdrom.audio);
+            bus.spu.cd_audio.extend(a);
+        }
         bus.spu.tick(cycles, if self.sampling { Some(&mut self.samples) } else { None });
         if std::mem::take(&mut bus.spu.irq) {
             bus.raise(irq::SPU);
         }
     }
+}
+
+/// The boot program of a disc: SYSTEM.CNF's `BOOT = cdrom:\NAME;1` (or PSX.EXE), with its STACK.
+pub fn boot_exe_from_disc(d: &Disc) -> Result<Exe, String> {
+    let (path, stack) = match d.read_file("SYSTEM.CNF") {
+        Some(cnf) => {
+            let text = String::from_utf8_lossy(&cnf).to_string();
+            let mut boot = None;
+            let mut stack = None;
+            for line in text.lines() {
+                let Some((k, v)) = line.split_once('=') else { continue };
+                let (k, v) = (k.trim().to_ascii_uppercase(), v.trim());
+                if k == "BOOT" {
+                    let v = v.split_whitespace().next().unwrap_or("");
+                    boot = Some(v.trim_start_matches("cdrom:").trim_start_matches("CDROM:").to_string());
+                } else if k == "STACK" {
+                    stack = u32::from_str_radix(v.trim_start_matches("0x"), 16).ok();
+                }
+            }
+            (boot.ok_or("SYSTEM.CNF has no BOOT line")?, stack)
+        }
+        None => ("PSX.EXE;1".to_string(), None),
+    };
+    let data = d.read_file(&path).ok_or(format!("the disc's boot file {path} isn't on the disc"))?;
+    let mut exe = Exe::parse(&data)?;
+    if let Some(sp) = stack {
+        exe.sp = sp;
+    }
+    Ok(exe)
 }

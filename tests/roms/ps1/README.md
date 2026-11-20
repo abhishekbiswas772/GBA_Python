@@ -14,6 +14,7 @@ real console produced: `psx.log` (TTY output) or `vram.png` (frame buffer).
 | 4bit, 8bit, frame-15bit-dma | MDEC decoding | `vram.png` |
 | memory-transfer | SPU RAM: manual, DMA, DMA timing | `psx.log` |
 | stereo | SPU voices and panning | none (checked for left/right by design of the test) |
+| cdrom-timing | CD-ROM command, seek, sector and pause timing (run from a generated test disc) | `psx.log` (five runs on a console: the core must land in their range) |
 
 `otc-test.exe`, `test-all.exe` and `memory-transfer.exe` are newer builds than their
 `psx.log`: they print extra passing sub-tests, so their logs are checked in order

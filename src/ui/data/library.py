@@ -1,4 +1,4 @@
-"""ROM library: finds .gb / .gbc / .gba / .nes files and reports their system and play history."""
+"""ROM library: finds .gb / .gbc / .gba / .nes / PS1 (.exe, .cue, .iso) files and reports their system and play history."""
 from __future__ import annotations
 
 import re
@@ -9,7 +9,7 @@ from pathlib import Path
 from src.ui.data.settings import Settings
 
 ROM_EXTS = {".gb": "GB", ".gbc": "GBC", ".cgb": "GBC", ".gba": "GBA", ".agb": "GBA", ".nes": "NES",
-            ".exe": "PS1", ".psx": "PS1"}
+            ".exe": "PS1", ".psx": "PS1", ".cue": "PS1", ".iso": "PS1"}
 
 # Consoles the bundled core can actually run.
 PLAYABLE = {"GB", "GBC", "GBA", "NES", "PS1"}
@@ -44,6 +44,8 @@ def _title_from_name(stem: str) -> str:
 
 def _detect_system(path: Path) -> str | None:
     system = ROM_EXTS.get(path.suffix.lower())
+    if system == "PS1" and path.suffix.lower() in (".cue", ".iso"):
+        return system
     if system == "PS1":
         # only real PS-X EXEs: a ROM folder may well contain Windows .exe files
         from src.core.ps1 import is_exe

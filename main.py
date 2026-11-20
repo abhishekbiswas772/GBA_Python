@@ -60,7 +60,7 @@ def ensure_rom_dir() -> Path:
     for sub in ROM_SUBDIRS:
         (ROM_DIR / sub).mkdir(parents=True, exist_ok=True)
     if created:
-        print(f"[created ROM folder {ROM_DIR} - put your .gb / .gbc / .gba / .nes / PS-X .exe files in it]")
+        print(f"[created ROM folder {ROM_DIR} - put your .gb / .gbc / .gba / .nes / PS1 .exe or .cue files in it]")
     return ROM_DIR
 
 
@@ -113,6 +113,9 @@ def cmd_app(args) -> None:
 def cmd_info(args) -> None:
     rom = _check_rom(args.rom)
     system = _system(rom)
+    if system == "PS1" and Path(rom).suffix.lower() in (".cue", ".iso"):
+        print(f"[PS1] CD image {Path(rom).name}")
+        return
     if system == "PS1":
         import struct
         head = Path(rom).read_bytes()[:0x800]

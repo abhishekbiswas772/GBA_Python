@@ -19,7 +19,7 @@ Public API::
 * ``.gbc`` / ``.cgb``            -> Game Boy Color (:class:`~src.bridge.gb_machine.GameBoyMachine`)
 * ``.gb``                        -> auto: CGB when the header says so, else DMG
 * ``.nes``                       -> NES (:class:`~src.bridge.nes_machine.NESMachine`)
-* ``.exe`` / ``.psx`` (PS-X EXE)   -> PS1, experimental Rust core
+* ``.exe`` / ``.psx`` (PS-X EXE), ``.cue`` / ``.iso`` (CD) -> PS1, experimental Rust core
   (:class:`~src.bridge.ps1_machine.PS1Machine`)
 
 Options: ``cgb`` (force GB/DMG vs CGB), ``bios`` (GBA BIOS image path),
@@ -45,7 +45,7 @@ __all__ = [
 ]
 
 _ROM_EXTS = {".gba": "GBA", ".agb": "GBA", ".gbc": "GBC", ".cgb": "GBC", ".gb": "GB", ".nes": "NES",
-             ".exe": "PS1", ".psx": "PS1"}
+             ".exe": "PS1", ".psx": "PS1", ".cue": "PS1", ".iso": "PS1"}
 
 
 def detect(path) -> str:
@@ -59,12 +59,12 @@ def detect(path) -> str:
     system = _ROM_EXTS.get(p.suffix.lower())
     if system is None:
         raise ValueError(
-            f"unrecognised ROM extension {p.suffix!r} (expected .gb, .gbc, .cgb, .gba, .agb, .nes or .exe)")
+            f"unrecognised ROM extension {p.suffix!r} (expected .gb, .gbc, .cgb, .gba, .agb, .nes, .exe, .cue or .iso)")
     if system == "PS1":
-        from src.core.ps1 import is_exe
+        from src.core.ps1 import DISC_EXTS, is_exe
         if not p.is_file():
             raise FileNotFoundError(f"can't read {p}")
-        if not is_exe(p):
+        if p.suffix.lower() not in DISC_EXTS and not is_exe(p):
             raise ValueError(f"{p.name} isn't a PS-X EXE")
     if system == "GB":
         try:                       # header CGB flag: 0x80 = enhanced, 0xC0 = CGB only

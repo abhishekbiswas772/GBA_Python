@@ -9,6 +9,7 @@ L→L1, R→R1. △, □, L2 and R2 can be pressed with :meth:`press_ps1`.
 """
 from __future__ import annotations
 
+import re
 from array import array
 from pathlib import Path
 
@@ -16,6 +17,8 @@ from src.bridge.base import Machine, normalize_button
 from src.core import ps1 as core
 
 CANVAS = (320, 240)
+# boot files named by a product serial (SCUS_949.00, SLES_123.45, ...) mean a licensed game
+_COMMERCIAL = re.compile(rb"BOOT\s*=\s*cdrom:\\?S[CL][A-Z]{2}[_-]\d{3}\.\d{2}", re.I)
 
 # PS1 pad bits (as sent over SIO): Select L3 R3 Start Up Right Down Left L2 R2 L1 R1 △ ○ ✕ □
 PAD_BITS = {
@@ -47,7 +50,8 @@ class _Audio:
 
 
 class PS1Machine(Machine):
-    """``Machine`` adapter for the PS1 core. ``rom``: a PS-X EXE path; ``bios``: optional BIOS path.
+    """``Machine`` adapter for the PS1 core. ``rom``: a PS-X EXE or a CD image (.cue / .iso);
+    ``bios``: optional BIOS path (needed by commercial discs).
 
     ``self.core`` is a :class:`src.core.ps1.Ps1Core` (picklable, for save states and rewind);
     the Rust machine itself is ``self.core.ps1``."""
@@ -60,11 +64,18 @@ class PS1Machine(Machine):
             raise RuntimeError("The PS1 core isn't built. Run: uv run python -m src.core.ps1.build "
                                f"({core.IMPORT_ERROR})")
         self.path = Path(rom)
-        data = self.path.read_bytes()
-        if not data.startswith(core.EXE_MAGIC):
-            raise ValueError("Only PS-X EXE programs run for now; CD images (.cue/.bin) come with "
-                             "the CD-ROM milestone.")
-        self.core = core.Ps1Core(Path(bios).read_bytes() if bios else None, data)
+        bios_data = Path(bios).read_bytes() if bios else None
+        if core.is_disc(self.path):
+            self.core = core.Ps1Core(bios_data, disc=str(self.path))
+            if bios_data is None and _COMMERCIAL.search(self.core.disc_id or b""):
+                raise ValueError("Commercial PS1 discs need a BIOS: add your own console's BIOS dump in "
+                                 "Settings > BIOS & firmware. Without one only PS-X EXEs and homebrew "
+                                 "discs run.")
+        else:
+            data = self.path.read_bytes()
+            if not data.startswith(core.EXE_MAGIC):
+                raise ValueError(f"{self.path.name} is neither a PS-X EXE nor a CD image (.cue / .iso)")
+            self.core = core.Ps1Core(bios_data, data)
         self.fps = self.core.ps1.fps
         self._buttons = 0
         self._apu = _Audio(self)
@@ -72,7 +83,8 @@ class PS1Machine(Machine):
 
     @property
     def title_info(self) -> str:
-        return f"PS-X EXE · {'BIOS' if self.core.bios else 'HLE kernel'} · core {core.VERSION}"
+        kind = "CD" if self.core.disc else "PS-X EXE"
+        return f"{kind} · {'BIOS' if self.core.bios else 'HLE kernel'} · core {core.VERSION}"
 
     def run_frame(self, render: bool = True) -> None:
         ps1 = self.core.ps1
@@ -113,8 +125,8 @@ class PS1Machine(Machine):
         return False                 # memory cards come in a later milestone
 
     def reset(self) -> None:
-        self.core = core.Ps1Core(self.core.bios, self.core.exe)
+        self.core = core.Ps1Core(self.core.bios, self.core.exe, self.core.disc)
 
     def state_blobs(self) -> list:
-        """The EXE (first: it identifies the game) and the BIOS, kept out of every state."""
-        return [b for b in (self.core.exe, self.core.bios) if b is not None]
+        """The EXE or disc id (first: it identifies the game) and the BIOS, kept out of every state."""
+        return [b for b in (self.core.exe, self.core.disc_id, self.core.bios) if b is not None]
