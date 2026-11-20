@@ -294,3 +294,22 @@ def test_runner_submit_save_load_and_rewind(tmp_path):
     finally:
         r.close()
     assert r.submit(lambda m: 1).exception(5) is not None      # stopped: fails, never hangs
+
+
+def test_loaded_gba_state_keeps_working_handlers(tmp_path):
+    """Bus handlers are closures a state can't hold (they pickle as KEEP). Loading a file
+    into a new session must leave the live, working handlers in place: FireRed crashed on
+    its first write after a load when they were replaced by the placeholder."""
+    m = _machine(ROMS / "gba" / "stripes.gba")
+    m.run_frames(30)
+    f = tmp_path / "s.state"
+    savestate.save_file(m, f)
+    fresh = _machine(ROMS / "gba" / "stripes.gba")
+    savestate.load_file(fresh, f)
+    bus = fresh.core.bus
+    tables = [bus.R8, bus.R16, bus.R32, bus.W8, bus.W16, bus.W32,
+              list(bus.io_read.values()), list(bus.io_write.values())]
+    assert not [h for t in tables for h in t if h is savestate.KEEP]
+    for a in (0x02000000, 0x03000000, 0x05000000, 0x06000000):   # every RAM region still writes
+        bus.write16(a, 0x1234)
+        assert bus.read16(a) == 0x1234

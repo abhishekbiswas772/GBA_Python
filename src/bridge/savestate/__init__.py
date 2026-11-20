@@ -162,12 +162,41 @@ def _resume_audio(machine, sampling: bool) -> None:
 
 
 def _merge(new_memo: dict, live: dict) -> None:
-    pair: dict[int, object] = {}
+    """Copy a snapshot into the live objects it was taken from (paired by pickle memo index)."""
+    pairs = []
     for i, live_obj in live.items():
         new_obj = new_memo.get(i)
         if new_obj is not None and type(new_obj) is type(live_obj):
-            pair[id(new_obj)] = live_obj
-    instance_dicts = {id(o.__dict__) for o in live.values() if hasattr(o, "__dict__")}
+            pairs.append((new_obj, live_obj))
+    _merge_pairs(pairs)
+
+
+def _pair_by_path(new_root, live_root) -> list:
+    """(loaded, live) object pairs found at the same attribute / index / key path from the
+    two roots. Used for a state from another session, whose pickle memo indices needn't line
+    up with the live core's."""
+    pairs, seen = [], set()
+    stack = [(new_root, live_root)]
+    while stack:
+        new, live = stack.pop()
+        if type(new) is not type(live) or id(live) in seen or not _stateful(live):
+            continue
+        seen.add(id(live))
+        pairs.append((new, live))
+        if isinstance(live, list):
+            stack += zip(new, live)
+        elif isinstance(live, dict):
+            stack += [(new[k], live[k]) for k in new.keys() & live.keys()]
+        elif hasattr(live, "__dict__") and not isinstance(live, (bytearray, array.array, set)):
+            skip = getattr(type(live), "_NOT_STATE", ())
+            ld = live.__dict__
+            stack += [(x, ld[k]) for k, x in new.__dict__.items() if k in ld and k not in skip]
+    return pairs
+
+
+def _merge_pairs(pairs: list) -> None:
+    pair: dict[int, object] = {id(n): o for n, o in pairs}
+    instance_dicts = {id(o.__dict__) for _, o in pairs if hasattr(o, "__dict__")}
 
     def tr(v):
         o = pair.get(id(v))
@@ -182,10 +211,7 @@ def _merge(new_memo: dict, live: dict) -> None:
                 return getattr(owner, v.__func__.__name__)
         return v
 
-    for i, live_obj in live.items():
-        new_obj = new_memo.get(i)
-        if new_obj is None or type(new_obj) is not type(live_obj):
-            continue
+    for new_obj, live_obj in pairs:
         if isinstance(live_obj, (bytearray, array.array)):
             live_obj[:] = new_obj
         elif isinstance(live_obj, list):
@@ -264,6 +290,23 @@ def _adopt(machine, raw: bytes, restricted: bool) -> None:
     hooks._PENDING.clear()
     core = _Unpickler(io.BytesIO(raw), machine.state_blobs(), restricted).load()
     hooks.finish_rebuild()
+    if type(core) is type(machine.core):
+        # Copy into the live core instead of swapping it: helpers that can't be pickled
+        # (bus handler closures, generated code) came back as KEEP and must stay the live
+        # ones, which are wired to these same objects.
+        live = machine.core
+        cart = getattr(live, "cart", None)
+        kept = {k: cart.__dict__[k] for k in ("path", "sav_path", "save_ram")
+                if cart is not None and k in cart.__dict__}
+        pairs = _pair_by_path(core, live)
+        _merge_pairs(pairs)
+        for _, obj in pairs:                 # drop code caches compiled from the old RAM
+            if isinstance(obj, hooks.Snapshottable):
+                obj._rebuild_transient()
+        if cart is not None:
+            cart.__dict__.update(kept)       # keep this session's ROM / .sav locations
+        machine.adopt_core(live)
+        return
     old, new = getattr(machine.core, "cart", None), getattr(core, "cart", None)
     if old is not None and new is not None:      # keep this session's ROM / .sav locations
         for k in ("path", "sav_path", "save_ram"):
