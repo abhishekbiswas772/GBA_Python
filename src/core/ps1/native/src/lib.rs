@@ -1,4 +1,4 @@
-//! Experimental PlayStation (PS1) core for GBA Python.
+//! Experimental PlayStation (PS1) core for RetroPy.
 //!
 //! Status: milestone 1. Done: CPU, bus, DMA, timers, IRQs, GPU rasterizer,
 //! digital pad, PS-X EXE loading, an HLE kernel, and BIOS booting.

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/icon.png" width="96" alt="GBA Python icon" />
+  <img src="assets/icon.png" width="96" alt="RetroPy icon" />
 </p>
 
-<h1 align="center">GBA Python</h1>
+<h1 align="center">RetroPy</h1>
 
 <p align="center">
   <b>Game Boy · Game Boy Color · Game Boy Advance · NES · PlayStation (experimental)</b><br/>
@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/abhishekbiswas772/GBA_Python/actions/workflows/ci.yml"><img src="https://github.com/abhishekbiswas772/GBA_Python/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/abhishekbiswas772/GBA_Python/actions/workflows/release.yml"><img src="https://github.com/abhishekbiswas772/GBA_Python/actions/workflows/release.yml/badge.svg" alt="Release" /></a>
+  <a href="https://github.com/abhishekbiswas772/RetroPy/actions/workflows/ci.yml"><img src="https://github.com/abhishekbiswas772/RetroPy/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/abhishekbiswas772/RetroPy/actions/workflows/release.yml"><img src="https://github.com/abhishekbiswas772/RetroPy/actions/workflows/release.yml/badge.svg" alt="Release" /></a>
   <img src="https://img.shields.io/badge/python-3.13+-3776AB?logo=python&logoColor=white" alt="Python 3.13+" />
   <img src="https://img.shields.io/badge/pure-python-FFD43B?logo=python&logoColor=black" alt="Pure Python" />
   <img src="https://img.shields.io/badge/platforms-windows%20%C2%B7%20linux-3D55D6" alt="Windows and Linux" />
@@ -78,8 +78,8 @@
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/abhishekbiswas772/GBA_Python.git
-cd GBA_Python
+git clone https://github.com/abhishekbiswas772/RetroPy.git
+cd RetroPy
 uv sync
 uv run python main.py          # opens the library
 ```
@@ -129,7 +129,7 @@ Paths can be relative to `rom/` (`main.py nes/game.nes`).
 
 </details>
 
-Prebuilt **Windows** and **Linux** apps are attached to every [release](https://github.com/abhishekbiswas772/GBA_Python/releases).
+Prebuilt **Windows** and **Linux** apps are attached to every [release](https://github.com/abhishekbiswas772/RetroPy/releases).
 
 ---
 

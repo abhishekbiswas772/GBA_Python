@@ -1,5 +1,5 @@
 [project]
-name = "gba-python"
+name = "retropy"
 version = "0.1.0"
 description = "Game Boy, Game Boy Color, Game Boy Advance and NES emulator in pure Python, with a Flet desktop app"
 readme = "README.md"
@@ -22,17 +22,17 @@ dev = ["pytest", "pygame>=2.6.1"]
 
 [tool.flet]
 org = "com.abhishekbiswas"
-product = "GBA Python"
-artifact = "GBA Python"
+product = "RetroPy"
+artifact = "RetroPy"
 company = "Abhishek Biswas"
 copyright = "Copyright (C) 2026 Abhishek Biswas"
-bundle_id = "com.abhishekbiswas.gameboy_python"
+bundle_id = "com.abhishekbiswas.retropy"
 icon_background = "#0F1115"
 splash_color = "#0F1115"
 
 [tool.flet.app]
 module = "main.py"
-exclude = ["tests", "rom", "src/rom", "docs", "src/core/ps1/native/target"]
+exclude = ["tests", "rom", "src/rom", "docs", "packaging", "src/core/ps1/native/target"]
 
 [tool.flet.windows]
 dependencies = ["pygame>=2.6.1"]
@@ -41,7 +41,7 @@ dependencies = ["pygame>=2.6.1"]
 dependencies = ["pygame>=2.6.1"]
 
 [tool.flet.linux]
-bundle_id = "com.abhishekbiswas.gameboy_python"
+bundle_id = "com.abhishekbiswas.retropy"
 dependencies = ["pygame>=2.6.1"]
 
 [tool.flet.android]

@@ -17,7 +17,7 @@ from src.ui.state import UIState
 from src.ui.theme import CONSOLE_THEME, FONTS, THEMES, Theme, family
 from src.ui.components.layout import WIDE_BREAKPOINT
 
-APP_NAME = "GBA Python"
+APP_NAME = "RetroPy"
 VERSION = "0.1.0"
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 

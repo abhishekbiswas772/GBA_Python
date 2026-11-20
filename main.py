@@ -1,4 +1,4 @@
-"""GBA Python launcher: desktop app or command line.
+"""RetroPy launcher: desktop app or command line.
 
     python main.py                      desktop app (library: ./rom + your ROM folders)
     python main.py app [ROM]            desktop app, optionally straight into a game

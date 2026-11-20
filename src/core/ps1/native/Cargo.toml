@@ -2,7 +2,7 @@
 name = "ps1"
 version = "0.1.0"
 edition = "2021"
-description = "Experimental PlayStation (PS1) core for GBA Python, exposed to Python with PyO3"
+description = "Experimental PlayStation (PS1) core for RetroPy, exposed to Python with PyO3"
 license = "MIT"
 publish = false
 

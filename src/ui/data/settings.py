@@ -1,7 +1,7 @@
 """User settings and play history, persisted as JSON.
 
 Stored in Flet's per-app storage dir when packaged (desktop, mobile), else in
-~/.gba_python. Everything the UI lets you change that should survive a restart
+~/.retropy (or ~/.gba_python from before the rename). Everything the UI lets you change that should survive a restart
 lives here; transient view state lives in `src.ui.state.UIState`.
 """
 from __future__ import annotations
@@ -85,7 +85,11 @@ HOTKEYS: dict[str, tuple[str, str]] = {
 
 def data_dir() -> Path:
     base = os.environ.get("FLET_APP_STORAGE_DATA")
-    path = Path(base) if base else Path.home() / ".gba_python"
+    if base:
+        path = Path(base)
+    else:
+        legacy = Path.home() / ".gba_python"          # the app's name before RetroPy: keep its settings
+        path = legacy if legacy.is_dir() else Path.home() / ".retropy"
     path.mkdir(parents=True, exist_ok=True)
     return path
 

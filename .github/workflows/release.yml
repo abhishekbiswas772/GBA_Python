@@ -1,8 +1,8 @@
-# Desktop builds: Windows and Linux only.
-# Bundle id: com.abhishekbiswas.gameboy_python
+# Desktop releases: a Windows installer (.exe) + portable zip, and a Linux .deb + tar.gz.
+# Bundle id: com.abhishekbiswas.retropy
 #
-# Push a tag such as v0.1.0 to build and publish a GitHub Release.
-# workflow_dispatch builds the same artifacts without publishing.
+# Push a tag such as v0.2.0 to test, build, check and publish a GitHub Release.
+# workflow_dispatch runs the same build and checks without publishing.
 
 name: Release
 
@@ -30,6 +30,7 @@ jobs:
     env:
       PYGAME_HIDE_SUPPORT_PROMPT: "1"
       PYTHONUNBUFFERED: "1"
+      PS1_CORE_REQUIRED: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -42,6 +43,12 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --frozen
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build the PS1 core
+        run: uv run python -m src.core.ps1.build
 
       - name: Unit tests and ROM tests
         run: |
@@ -76,8 +83,29 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            v="${GITHUB_REF_NAME#v}"
+            echo "flet=${v%%-*}" >> "$GITHUB_OUTPUT"      # flet wants x.y.z
+          else
+            v="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)-dev.${GITHUB_RUN_NUMBER}"
           fi
+          echo "value=${v}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${v}"
+
+      # the PS1 core is a native extension: build it so `flet build` bundles it
+      - name: Setup uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build the PS1 core
+        shell: bash
+        run: |
+          uv sync --frozen
+          uv run python -m src.core.ps1.build
 
       - name: Build app
         id: build
@@ -87,15 +115,95 @@ jobs:
           runner-python-version: "3.13"
           bundled-python-version: "3.13"
           build-number: ${{ github.run_number }}
-          build-version: ${{ steps.version.outputs.value }}
+          build-version: ${{ steps.version.outputs.flet }}
 
-      - name: Upload build archive
+      - name: Show the build
+        shell: bash
+        run: |
+          out="${{ steps.build.outputs.output-path }}"
+          echo "output: $out"
+          find "$out" -maxdepth 2 | head -n 60
+          if command -v python3 >/dev/null 2>&1; then py=python3; else py=python; fi
+          "$py" packaging/check_bundle.py "$out"
+
+      # ------------------------------------------------------------------ Windows
+      - name: Windows installer (Inno Setup)
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          choco install innosetup --no-progress -y | Out-Null
+          $out = "${{ steps.build.outputs.output-path }}"
+          $exe = (Get-ChildItem -Path $out -Filter *.exe -File | Select-Object -First 1).Name
+          Write-Host "app exe: $exe"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "/DAppVersion=${{ steps.version.outputs.value }}" "/DSourceDir=$out" `
+            "/DOutputDir=$PWD\dist" "/DAppExe=$exe" packaging\windows\retropy.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+          Copy-Item "${{ steps.build.outputs.archive-path }}" "dist\RetroPy-${{ steps.version.outputs.value }}-windows-x64-portable.zip"
+          Get-ChildItem dist
+
+      - name: Check the Windows installer
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $setup = (Get-ChildItem dist -Filter *-setup.exe | Select-Object -First 1).FullName
+          $dir = Join-Path $env:RUNNER_TEMP "RetroPyInstall"
+          $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=$dir" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+          $exe = Get-ChildItem -Path $dir -Filter *.exe -File | Where-Object { $_.Name -notlike "unins*" } | Select-Object -First 1
+          if (-not $exe) { throw "no app exe after install" }
+          Write-Host "installed: $($exe.FullName)"
+          $app = Start-Process -FilePath $exe.FullName -PassThru
+          Start-Sleep -Seconds 20
+          if ($app.HasExited) { throw "the app exited right away (code $($app.ExitCode))" }
+          Write-Host "app still running after 20 s: OK"
+          Stop-Process -Id $app.Id -Force
+          $u = Get-ChildItem -Path $dir -Filter unins*.exe | Select-Object -First 1
+          $p = Start-Process -FilePath $u.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "uninstaller exit code $($p.ExitCode)" }
+          Write-Host "uninstall: OK"
+
+      # ------------------------------------------------------------------ Linux
+      - name: Linux .deb
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash packaging/linux/build-deb.sh "${{ steps.build.outputs.output-path }}" "${{ steps.version.outputs.value }}" dist
+          cp "${{ steps.build.outputs.archive-path }}" "dist/RetroPy-${{ steps.version.outputs.value }}-linux-x64.tar.gz"
+          ls -la dist
+
+      - name: Check the .deb
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb="$(ls dist/*.deb | head -n 1)"
+          dpkg-deb --info "$deb"
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends "./$deb" xvfb
+          test -x "$(readlink -f /usr/bin/retropy)"
+          desktop-file-validate /usr/share/applications/retropy.desktop 2>/dev/null || true
+          set +e
+          xvfb-run -a timeout 20 retropy
+          code=$?
+          set -e
+          if [ "$code" -ne 124 ]; then
+            echo "::error::the app exited after start (code $code)"
+            exit 1
+          fi
+          echo "app still running after 20 s: OK"
+          sudo apt-get remove -y retropy
+
+      - name: Upload packages
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
-          path: ${{ steps.build.outputs.archive-path }}
+          path: dist/*
           if-no-files-found: error
-          archive: false
 
   publish:
     name: Publish GitHub Release
@@ -105,7 +213,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download build archives
+      - name: Download packages
         uses: actions/download-artifact@v7
         with:
           path: dist
@@ -113,24 +221,35 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           shopt -s globstar nullglob
-          files=(dist/**/*.*)
+          files=(dist/**/*.exe dist/**/*.deb dist/**/*.zip dist/**/*.tar.gz)
           if [ "${#files[@]}" -eq 0 ]; then
-            echo "::error::No build archives to publish."
+            echo "::error::No packages to publish."
             exit 1
           fi
+          (cd dist && sha256sum **/*.exe **/*.deb **/*.zip **/*.tar.gz | sed 's#  .*/#  #' > SHA256SUMS.txt)
+          files+=(dist/SHA256SUMS.txt)
           notes="$(cat <<'EOF'
-          Desktop builds for Windows and Linux.
+          ## Downloads
 
-          Bundle id: `com.abhishekbiswas.gameboy_python`.
+          | | |
+          |---|---|
+          | **Windows** installer | `RetroPy-…-windows-x64-setup.exe` |
+          | **Windows** portable | `RetroPy-…-windows-x64-portable.zip` |
+          | **Debian / Ubuntu** | `retropy_…_amd64.deb`, install with `sudo apt install ./retropy_…_amd64.deb` |
+          | **Linux** portable | `RetroPy-…-linux-x64.tar.gz` |
+
+          The PlayStation core is experimental. No BIOS or games are included.
+          Checksums are in `SHA256SUMS.txt`.
           EOF
           )"
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber
           else
             gh release create "${GITHUB_REF_NAME}" "${files[@]}" \
-              --title "${GITHUB_REF_NAME}" \
+              --title "RetroPy ${GITHUB_REF_NAME}" \
               --notes "${notes}"
           fi

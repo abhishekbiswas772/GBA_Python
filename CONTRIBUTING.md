@@ -1,4 +1,4 @@
-# Contributing to GBA Python
+# Contributing to RetroPy
 
 Thanks for wanting to help. This project emulates the Game Boy, Game Boy Color, Game Boy Advance and NES in pure Python. Every kind of contribution is welcome: bug reports, test-ROM results, speed-ups, new mappers, UI polish and docs.
 
@@ -12,8 +12,8 @@ Thanks for wanting to help. This project emulates the Game Boy, Game Boy Color, 
 ## Setup
 
 ```bash
-git clone https://github.com/abhishekbiswas772/GBA_Python.git
-cd GBA_Python
+git clone https://github.com/abhishekbiswas772/RetroPy.git
+cd RetroPy
 uv sync                      # Python 3.13+, installs Flet, pygame and pytest
 uv run python main.py        # the desktop app
 ```

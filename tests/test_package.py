@@ -3,7 +3,7 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BUNDLE_ID = "com.abhishekbiswas.gameboy_python"
+BUNDLE_ID = "com.abhishekbiswas.retropy"
 
 
 def test_bundle_id_and_flet_entry():
