@@ -63,8 +63,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build the PS1 core (Rust + PyO3)
+        run: uv run python -m src.core.ps1.build
+
       - name: Unit tests
         shell: bash
+        env:
+          PS1_CORE_REQUIRED: "1"
         run: |
           set -euo pipefail
           if [ "${RUNNER_OS}" = "Linux" ]; then

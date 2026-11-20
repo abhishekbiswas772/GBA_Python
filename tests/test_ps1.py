@@ -7,6 +7,7 @@ text) or ``vram.png`` (the frame buffer). Skipped when the core isn't built
 """
 from __future__ import annotations
 
+import os
 import struct
 from pathlib import Path
 
@@ -16,6 +17,12 @@ from src.core import ps1
 
 ROMS = Path(__file__).parent / "roms" / "ps1"
 needs_core = pytest.mark.skipif(not ps1.AVAILABLE, reason="PS1 core not built")
+
+
+def test_core_built_when_required():
+    """CI builds the core and sets PS1_CORE_REQUIRED, so a broken build fails instead of skipping."""
+    if os.environ.get("PS1_CORE_REQUIRED") and not ps1.AVAILABLE:
+        pytest.fail(f"PS1 core missing: {ps1.IMPORT_ERROR}")
 
 LOG_TESTS = ["cop", "code-in-io", "dpcr", "otc-test", "gp0-e1", "mask-bit"]
 VRAM_TESTS = ["rectangles", "triangle", "transparency", "quad"]
