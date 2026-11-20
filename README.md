@@ -33,23 +33,24 @@
 </p>
 
 <p align="center">
-  <img src="docs/systems.png" width="900" alt="One frame from each core: DMG Acid2 on Game Boy, CGB Acid2 on Game Boy Color, a Hello world test ROM on Game Boy Advance, and the blargg CPU timing test passing on NES" />
+  <img src="docs/games.png" width="900" alt="One frame from each core running a real game: Pokémon Red in Pallet Town on Game Boy, Link from the Oracle of Ages opening on Game Boy Color, the Pokémon FireRed title screen with Charizard on Game Boy Advance, and Contra stage 1 on NES" />
 </p>
 
 <table align="center">
   <tr>
-    <td align="center"><img src="docs/demo.gif" width="360" alt="The Game Boy core running an original scene" /><br/><sub><b>Game Boy</b>: an original scene</sub></td>
-    <td align="center"><img src="docs/nes.gif" width="300" alt="The NES core running blargg's CPU timing, sprite hit and palette tests" /><br/><sub><b>NES</b>: working through blargg's hardware tests</sub></td>
+    <td align="center"><img src="docs/game-gb.gif" width="360" alt="Pokémon Red on the Game Boy core: the title screen, Professor Oak saying hello, then walking around Pallet Town" /><br/><sub><b>Game Boy</b>: Pokémon Red</sub></td>
+    <td align="center"><img src="docs/game-nes.gif" width="384" alt="Contra on the NES core: running through stage 1, shooting soldiers and a pillbox sensor" /><br/><sub><b>NES</b>: Contra</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/color.gif" width="300" alt="CGB Acid2 drawn by the emulator" /><br/><sub><b>Game Boy Color</b>: CGB Acid2</sub></td>
-    <td align="center"><img src="docs/advance.gif" width="340" alt="The GBA core showing Hello world" /><br/><sub><b>Game Boy Advance</b>: open test ROM</sub></td>
+    <td align="center"><img src="docs/game-gbc.gif" width="360" alt="The opening cutscene of The Legend of Zelda: Oracle of Ages on the Game Boy Color core: a sunset ride, a close-up of Link, the castle" /><br/><sub><b>Game Boy Color</b>: Zelda: Oracle of Ages</sub></td>
+    <td align="center"><img src="docs/game-gba.gif" width="384" alt="Pokémon FireRed on the GBA core: the Gengar versus Nidorino intro, then the Charizard title screen" /><br/><sub><b>Game Boy Advance</b>: Pokémon FireRed</sub></td>
   </tr>
 </table>
 
 <p align="center">
-  <sub>Every frame above is drawn by this emulator, running open test ROMs. No commercial game is shown or shipped.
-  Regenerate them yourself with <code>uv run python docs/make_media.py</code>.</sub>
+  <sub>Every frame above is drawn by this emulator, from the author's own cartridge dumps, played headlessly with scripted button presses.
+  No game is included in this repository. With your own dumps in <code>rom/</code>, regenerate the media with <code>uv run python docs/make_game_media.py</code>.
+  PlayStation is left out because CD-ROM games don't run yet.</sub>
 </p>
 
 ---
@@ -137,6 +138,10 @@ Prebuilt **Windows** and **Linux** apps are attached to every [release](https://
 
 ### Library
 
+<p align="center">
+  <img src="docs/ui-library.png" width="900" alt="The library screen: a sidebar with console filters, a Continue playing card for Pokémon Red with Resume and Load slot 1 buttons, and cover cards for Pokémon Red, Zelda: Oracle of Ages, Pokémon FireRed and Contra" />
+</p>
+
 - Every game found in your ROM folders appears as a card with a cover. Games you haven't played yet get an auto-generated preview, which is swapped for your last frame once you play.
 - **Search** with `Ctrl+K`.
 - **Filter** by console in the sidebar, or open **Favorites**. Sort by last played, title or system.
@@ -147,18 +152,9 @@ Prebuilt **Windows** and **Linux** apps are attached to every [release](https://
 
 ### Player
 
-```text
-┌ ← Library  Game title [NES]   ⏸ ⏪ ⏩ ⟲ │ 📷  ● Record  ⟲ Clip last 30s │ ⛶ ┐
-│                                             ┌ Save states ────────────┐ │
-│                                             │ [thumb] Slot 1 · 2m ago ● │ │
-│              game screen                    │ [     ] Slot 2 · Empty    │ │
-│                                             │ [ Save ]       [ Load ]   │ │
-│                                             │ Resume point · 1h ago     │ │
-│                                             │ Rewind: hold R · 18 s     │ │
-│                                             │ Speed  1× 2× 4× 8×        │ │
-│                                             └───────────────────────────┘ │
-└ ● Running  60 FPS · game 100%  Slot 1  Replay buffer 30 s  ● REC          ┘
-```
+<p align="center">
+  <img src="docs/ui-player.png" width="900" alt="The player running Pokémon Red in Pallet Town. The toolbar has pause, rewind, fast-forward, reset, screenshot, Record and Clip last 30s. The side panel shows save-state slots 1 and 2 with thumbnails, Save and Load buttons, 13 seconds of rewind available, the speed picker (1×, 2×, 4×, 8×), volume, the replay buffer toggle and Record as MP4 or GIF. The footer reads Running, 59 FPS, game 100%." />
+</p>
 
 - **Toolbar:** pause, rewind, fast-forward, reset, screenshot, **Record** (shows a running timer while recording), **Clip last 30s**, fullscreen.
 - **Save states panel:**
@@ -171,9 +167,23 @@ Prebuilt **Windows** and **Linux** apps are attached to every [release](https://
 
 ### Moments
 
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/ui-recording.png" width="440" alt="The player while recording: the Record button has become a red Stop 0:06 timer and the footer shows REC" /><br/><sub>Recording (the timer replaces the Record button)</sub></td>
+    <td align="center"><img src="docs/ui-moments.png" width="440" alt="The Moments screen showing the MP4 just recorded from Pokémon Red, with Play, Show in folder, Delete and Export MP4 buttons" /><br/><sub>The recording in Moments, with sound (H.264 + AAC)</sub></td>
+  </tr>
+</table>
+
 Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest first. Filter by **Recordings & clips** or **Screenshots**. GIFs play in the preview, and videos show a poster frame. For a selected moment you can **Export** it, **Play** it (videos) or **Copy to clipboard** (images), **Show in folder** or **Delete** it.
 
 ### Settings
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/ui-settings.png" width="440" alt="Settings, Controls: the Game Boy Advance keyboard layout with primary and secondary keys for each button, and tabs for Game Boy, Game Boy Color, NES and PlayStation" /><br/><sub>Controls: one layout per console</sub></td>
+    <td align="center"><img src="docs/ui-themes.png" width="440" alt="Themes and screen: the Midnight, Daylight, DMG Green and Berry app themes, the screen shaders, the original Game Boy palettes, and the LCD colour, integer scaling and frame blending toggles" /><br/><sub>Themes &amp; screen</sub></td>
+  </tr>
+</table>
 
 | Section | What's there |
 |---|---|
@@ -195,8 +205,8 @@ Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest fi
 | Your ROMs | `rom/gb`, `rom/gb_color`, `rom/gba`, `rom/nes`, `rom/ps1`, or any folder you add |
 | Battery saves | `saves/<console>/<game>/<game>.sav` (`gb`, `gbc`, `gba`, `nes` or `ps1`) |
 | Save states | `saves/<console>/<game>/states/slot<N>.state` (+ `.png` thumbnail) |
-| Screenshots, recordings, clips | `~/.gba_python/moments/` |
-| Settings, covers | `~/.gba_python/` (the app storage folder when packaged) |
+| Screenshots, recordings, clips | `~/.retropy/moments/` |
+| Settings, covers | `~/.retropy/` (`~/.gba_python/` if you have one from before the rename; the app storage folder when packaged) |
 
 ### Feature status
 
@@ -478,12 +488,12 @@ src/bridge/rewind/       rewind ring buffer
 src/bridge/recorder/     MP4 (with sound) / GIF recording and the 30 s replay buffer
 src/ui/                  Flet app (library, player, settings, themes)
 tests/roms/              open test ROMs: blargg, Acid2, jsmolka, nes-test-roms, ps1-tests
-docs/                    README media and make_media.py
+docs/                    README media, make_media.py (test ROMs), make_game_media.py (your games), launch/ kit
 rom/                     yours, git-ignored
 saves/                   battery saves, one folder per console and game (git-ignored)
 ```
 
-Settings, thumbnails and screenshots are stored in `~/.gba_python` while you develop, and in the app storage directory once packaged.
+Settings, thumbnails and screenshots are stored in `~/.retropy` (or an existing `~/.gba_python`) while you develop, and in the app storage directory once packaged.
 
 </details>
 
@@ -506,6 +516,14 @@ uv run python -m tests.run_tests       # Game Boy blargg speed report
 | blargg `ppu_vbl_nmi` | 9/10 (even/odd frame timing in progress) |
 | blargg Game Boy `cpu_instrs`, DMG Acid2, CGB Acid2, jsmolka GBA | ✅ |
 | ps1-tests (10 bundled; skipped when the PS1 core isn't built) | ✅ see [PlayStation](#-playstation-experimental) |
+
+<p align="center">
+  <img src="docs/systems.png" width="760" alt="Open test ROMs passing, one frame per core: DMG Acid2 on Game Boy, CGB Acid2 on Game Boy Color, a Hello world test ROM on Game Boy Advance, and the blargg CPU timing test passing on NES" />
+  <br/>
+  <img src="docs/nes.gif" width="300" alt="The NES core running blargg's CPU timing, sprite hit and palette tests" />
+</p>
+
+<p align="center"><sub>The same cores running open hardware test ROMs (regenerate with <code>uv run python docs/make_media.py</code>).</sub></p>
 
 Commercial carts are optional, and those tests are skipped when `rom/` is empty. They run from a temporary copy, so a real `.sav` is never touched.
 
@@ -580,7 +598,7 @@ Bug reports, test-ROM results and pull requests are all welcome. See [CONTRIBUTI
 The code is released under the [MIT License](LICENSE).
 
 
-This project does not include, distribute or link to copyrighted ROMs or a Nintendo BIOS. Play games you own. The GBA core boots from a built-in high-level BIOS; a real BIOS dump is optional and never shipped.
+This project does not include, distribute or link to copyrighted ROMs or a Nintendo BIOS. The game screenshots, GIFs and the demo video come from the author's own cartridge dumps, which are kept in the git-ignored `rom/` folder and never committed. Pokémon, The Legend of Zelda and Contra are trademarks of Nintendo, Game Freak, Creatures, Capcom and Konami. Play games you own. The GBA core boots from a built-in high-level BIOS; a real BIOS dump is optional and never shipped.
 
 The bundled test ROMs keep their authors' terms:
 
