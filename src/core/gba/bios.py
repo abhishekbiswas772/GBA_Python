@@ -11,7 +11,7 @@ import math
 
 from src.core.gba.common import (
     M32, BIOS_LATCH_SWI, BIOS_IF_ADDR, MODE_IRQ, MODE_SVC, MODE_SYS,
-    SP_USR, SP_IRQ, SP_SVC, ROM_START, REG_DISPCNT,
+    SP_USR, SP_IRQ, SP_SVC, ROM_START, REG_DISPCNT, REG_BG2PA, REG_BG3PA,
 )
 from src.core.gba.dma import plain_slice
 
@@ -86,6 +86,12 @@ def register_ram_reset(cpu, bus):
         for off in range(0x000, 0x060, 2):
             bus.write16(0x04000000 + off, 0)
         bus.write16(0x04000000 + REG_DISPCNT, 0x0080)
+        # The real BIOS leaves the BG2/BG3 affine matrices at identity, not zero
+        # (PA = PD = 1.0). Games that never write them (FireRed's Oak intro draws
+        # him on affine BG2) would otherwise sample one texel for the whole line.
+        for pa in (REG_BG2PA, REG_BG3PA):
+            bus.write16(0x04000000 + pa, 0x100)
+            bus.write16(0x04000000 + pa + 6, 0x100)
     return 100
 
 
