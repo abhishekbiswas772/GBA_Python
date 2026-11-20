@@ -11,6 +11,7 @@ pub mod cpu;
 pub mod gpu;
 pub mod gte;
 pub mod hle;
+pub mod mdec;
 pub mod sio;
 pub mod spu;
 pub mod system;

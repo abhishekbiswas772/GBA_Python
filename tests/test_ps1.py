@@ -25,7 +25,7 @@ def test_core_built_when_required():
         pytest.fail(f"PS1 core missing: {ps1.IMPORT_ERROR}")
 
 LOG_TESTS = ["cop", "code-in-io", "dpcr", "otc-test", "gp0-e1", "mask-bit", "test-all"]
-VRAM_TESTS = ["rectangles", "triangle", "transparency", "quad"]
+VRAM_TESTS = ["rectangles", "triangle", "transparency", "quad", "4bit", "8bit", "frame-15bit-dma"]
 # the bundled otc-test.exe is a newer build than its psx.log: it runs two more
 # sub-tests, so its log is checked as "every console line appears, in order"
 NEWER_THAN_LOG = {"otc-test", "test-all"}
@@ -37,7 +37,7 @@ def _run(name: str, frames: int = 1500):
     for _ in range(frames):
         m.run_frame()
         tty += m.take_tty()
-        if b"Done." in tty:
+        if b"Done" in tty:
             break
     for _ in range(4):               # let the last draw land
         m.run_frame()
@@ -79,13 +79,14 @@ def test_tty_matches_hardware(name):
 @pytest.mark.parametrize("name", VRAM_TESTS)
 def test_vram_matches_hardware(name):
     from PIL import Image
-    m, _ = _run(name)
+    m, _ = _run(name, frames=400)
     ref = Image.open(ROMS / name / "vram.png").convert("RGB")
     px = struct.unpack("<524288H", m.vram())
     w, h = 320, 240                  # compare the drawn screen area
     exp = ref.crop((0, 0, w, h)).tobytes()
-    # Gouraud colours still round one 5-bit step off the console on ~0.4% of the
-    # triangle test's pixels: allow 1 step (8) per channel, nothing more.
+    # Gouraud colours (triangle, ~0.4% of pixels) and MDEC colour output (frame-15bit-dma,
+    # ~20% of pixels) still round one 5-bit step off the console: allow 1 step (8) per
+    # channel, nothing more. 4bit / 8bit (MDEC mono) and the other GPU tests are exact.
     bad = 0
     for y in range(h):
         for x in range(w):

@@ -253,7 +253,8 @@ Without that step the rest of the app is unchanged. PS1 games show up in the lib
 | CD-ROM (`.cue` / `.bin`) | 🚧 milestone 2 |
 | GTE (3D maths coprocessor): all 22 commands, 44-bit MACs, flags, UNR division | ✅ 1,100/1,100 hardware fuzz cases, `gte/test-all` 1150/1150 |
 | SPU (sound) | 🚧 milestone 4: registers and RAM only, output is silence |
-| Memory cards, MDEC (video) | 🚧 later |
+| MDEC (FMV decoder): RLE, IDCT, YUV→RGB, 4/8/15/24-bit, CPU and DMA | ✅ mono output exact; colour within one 5-bit step |
+| Memory cards | 🚧 later |
 
 **Accuracy.** Checked against real-console output from [JaCzekanski's ps1-tests](https://github.com/JaCzekanski/ps1-tests) (MIT). Ten of them are bundled in `tests/roms/ps1` with their hardware logs and VRAM dumps:
 
@@ -264,6 +265,8 @@ Without that step the rest of the app is unchanged. PS1 games show up in the lib
 | `gpu/triangle` | ✅ within one 5-bit step on Gouraud colours (0.4% of pixels round differently) |
 | `gpu/clut-cache`, `gpu/lines`, `gpu/texture-flip`, `gpu/uv-interpolation` (not bundled) | 98.8–99.9% of pixels |
 | `cpu/access-time`, `dma/chopping`, `dma/chain-looping`, `gpu/bandwidth` | ❌ memory wait states and DMA timing aren't modelled yet |
+| `mdec/4bit`, `mdec/8bit` | ✅ VRAM identical to the console |
+| `mdec/frame` 15-bit (DMA) | ✅ every pixel within one 5-bit step (~80% exact); 24-bit bytes within ±3 |
 | `gte/test-all` (1,150 checks) and `gte-fuzz` (1,100 commands, all 64 registers compared) | ✅ identical to the console |
 
 **Speed.** About 220–250 emulated frames per second on the bundled tests (roughly 4× real time), measured on a laptop, including frame copies to Python.

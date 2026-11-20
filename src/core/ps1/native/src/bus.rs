@@ -45,12 +45,14 @@ pub struct Bus {
     pub spu: Spu,
     pub cdrom: Cdrom,
     pub sio: Sio,
-    pub mdec_ctrl: u32,
+    pub mdec: crate::mdec::Mdec,
     /// Text written to the TTY (DUART at 0x1F802023, or BIOS putchar).
     pub tty: Vec<u8>,
     pub post: u8,
     stall: u32,
     /// CPU cycles not yet applied to the timers.
+    #[serde(skip)]
+    dma_pending_mdec_out: bool,
     pub timer_lag: u32,
     timer_dot_frac: u32,
     timer_video_frac: u32,
@@ -82,10 +84,11 @@ impl Bus {
             spu: Spu::new(),
             cdrom: Cdrom::new(),
             sio: Sio::new(),
-            mdec_ctrl: 0,
+            mdec: crate::mdec::Mdec::default(),
             tty: Vec::new(),
             post: 0,
             stall: 0,
+            dma_pending_mdec_out: false,
             timer_lag: 0,
             timer_dot_frac: 0,
             timer_video_frac: 0,
@@ -290,8 +293,8 @@ impl Bus {
             }
             0x1F80_1810 => self.gpu.read(),
             0x1F80_1814 => self.gpu.status(),
-            0x1F80_1820 => 0,
-            0x1F80_1824 => 0x8004_0000 | (self.mdec_ctrl & 0x0780_0000),
+            0x1F80_1820 => self.mdec.read(),
+            0x1F80_1824 => self.mdec.status(),
             _ => 0,
         };
         v >> sh
@@ -363,8 +366,11 @@ impl Bus {
                 self.collect_gpu_irq();
             }
             0x1F80_1814 => self.gpu.gp1(v),
-            0x1F80_1820 => {}
-            0x1F80_1824 => self.mdec_ctrl = v,
+            0x1F80_1820 => {
+                self.mdec.write(v);
+                self.dma_try(1);
+            }
+            0x1F80_1824 => self.mdec.control(v),
             _ => {}
         }
     }
@@ -390,13 +396,28 @@ impl Bus {
         }
     }
 
+    /// After DMA0 fed the decoder, a waiting DMA1 can run (done by the caller, outside dma_block).
     fn dma_try(&mut self, ch: usize) {
+        self.dma_try_one(ch);
+        if std::mem::take(&mut self.dma_pending_mdec_out) {
+            self.dma_try_one(1);
+        }
+    }
+
+    fn dma_try_one(&mut self, ch: usize) {
         let c = self.dma[ch].chcr;
         let enabled = (self.dpcr >> (ch * 4 + 3)) & 1 != 0;
         let sync = (c >> 9) & 3;
         let start = c & (1 << 24) != 0 && (sync != 0 || c & (1 << 28) != 0);
         if !(start && enabled) {
             return;
+        }
+        if ch == 1 {
+            // MDECout waits for the decoder: the whole transfer, or whatever an idle decoder holds
+            let have = self.mdec.out.len() as u32;
+            if have < self.dma_words(ch) && !(self.mdec.idle() && have > 0) {
+                return;
+            }
         }
         if sync == 2 {
             self.dma_linked(ch);
@@ -411,17 +432,25 @@ impl Bus {
         self.dma_update_irq();
     }
 
-    fn dma_block(&mut self, ch: usize) {
-        let DmaChan { madr, bcr, chcr } = self.dma[ch];
-        let sync = (chcr >> 9) & 3;
-        let words = if sync == 0 {
+    fn dma_words(&self, ch: usize) -> u32 {
+        let DmaChan { bcr, chcr, .. } = self.dma[ch];
+        if (chcr >> 9) & 3 == 0 {
             let n = bcr & 0xFFFF;
             if n == 0 { 0x1_0000 } else { n }
         } else {
             let bs = bcr & 0xFFFF;
             let bc = bcr >> 16;
             (if bs == 0 { 0x1_0000 } else { bs }) * (if bc == 0 { 0x1_0000 } else { bc })
-        };
+        }
+    }
+
+    fn dma_block(&mut self, ch: usize) {
+        let DmaChan { madr, chcr, .. } = self.dma[ch];
+        let sync = (chcr >> 9) & 3;
+        let mut words = self.dma_words(ch);
+        if ch == 1 {
+            words = words.min(self.mdec.out.len() as u32);
+        }
         let step: u32 = if chcr & 2 != 0 { (-4i32) as u32 } else { 4 };
         let from_ram = chcr & 1 != 0;
         let mut addr = madr;
@@ -432,7 +461,7 @@ impl Bus {
                 match ch {
                     2 => self.gpu.gp0(w),
                     4 => self.spu.dma_write(w),
-                    0 => {}
+                    0 => self.mdec.write(w),
                     _ => {}
                 }
             } else {
@@ -441,6 +470,7 @@ impl Bus {
                         if n == words - 1 { 0x00FF_FFFF } else { addr.wrapping_sub(4) & 0x1F_FFFF }
                     }
                     2 => self.gpu.read(),
+                    1 => self.mdec.read_dma(),
                     3 => self.cdrom.dma_read(),
                     4 => self.spu.dma_read(),
                     _ => 0,
@@ -454,6 +484,9 @@ impl Bus {
             self.dma[ch].bcr &= 0xFFFF;
         }
         self.collect_gpu_irq();
+        if ch == 0 {
+            self.dma_pending_mdec_out = true;
+        }
     }
 
     fn dma_linked(&mut self, ch: usize) {
