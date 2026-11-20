@@ -213,7 +213,7 @@ Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest fi
 | PlayStation: PS-X EXE programs (CPU, GPU, DMA, timers, pad) | 🧪 experimental, Rust core |
 | PlayStation: save states and rewind | ✅ |
 | PlayStation: 3D maths (GTE) | ✅ |
-| PlayStation: CD games, sound (SPU), memory cards | 🚧 next milestones |
+| PlayStation: CD games, memory cards | 🚧 next milestones |
 | Cheats, achievements, link play | 🚧 UI preview, not in the cores yet |
 
 ---
@@ -252,7 +252,7 @@ Without that step the rest of the app is unchanged. PS1 games show up in the lib
 | Save states, resume point and rewind | ✅ the Rust core serializes itself (serde + bincode, ~3.6 MB raw, ~90 KB compressed); replay after a load is bit-identical |
 | CD-ROM (`.cue` / `.bin`) | 🚧 milestone 2 |
 | GTE (3D maths coprocessor): all 22 commands, 44-bit MACs, flags, UNR division | ✅ 1,100/1,100 hardware fuzz cases, `gte/test-all` 1150/1150 |
-| SPU (sound) | 🚧 milestone 4: registers and RAM only, output is silence |
+| SPU (sound): 24 ADPCM voices, ADSR, sweeps, pitch modulation, noise, Gaussian interpolation, reverb, IRQ | ✅ `spu/memory-transfer` matches a console (incl. DMA timing); voice output correlates 0.999 with an independent decoder. No console recording to compare playback against. |
 | MDEC (FMV decoder): RLE, IDCT, YUV→RGB, 4/8/15/24-bit, CPU and DMA | ✅ mono output exact; colour within one 5-bit step |
 | Memory cards | 🚧 later |
 
@@ -525,7 +525,7 @@ Push a tag like `v0.2.0` and GitHub Actions builds both apps and publishes them 
 ## 🧭 Honest limits
 
 - Cheats, achievements and link play are UI previews for now; the cores don't implement them yet.
-- The PS1 core is experimental: PS-X EXE programs only, no sound yet. Booting through a real BIOS is implemented but untested. CI and packaged builds don't compile it yet, so it is available when you build from source.
+- The PS1 core is experimental: PS-X EXE programs only. Booting through a real BIOS is implemented but untested. CI builds and tests it, and the release installers include it.
 - Sound uses SDL through pygame, so it works in the desktop app only.
 - The NES core is NTSC only. PAL and mappers beyond the ones listed above are welcome contributions.
 

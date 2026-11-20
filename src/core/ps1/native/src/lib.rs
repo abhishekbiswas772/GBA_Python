@@ -14,6 +14,7 @@ pub mod hle;
 pub mod mdec;
 pub mod sio;
 pub mod spu;
+mod spu_gauss;
 pub mod system;
 pub mod timers;
 
@@ -109,6 +110,11 @@ mod python {
                 out.extend_from_slice(&p.to_le_bytes());
             }
             PyBytes::new(py, &out)
+        }
+
+        /// The 512 KB of sound RAM.
+        fn spu_ram<'py>(&self, py: Python<'py>) -> Bound<'py, PyBytes> {
+            PyBytes::new(py, &self.sys.bus.spu.ram)
         }
 
         /// TTY text printed since the last call.

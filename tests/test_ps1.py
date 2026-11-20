@@ -24,11 +24,11 @@ def test_core_built_when_required():
     if os.environ.get("PS1_CORE_REQUIRED") and not ps1.AVAILABLE:
         pytest.fail(f"PS1 core missing: {ps1.IMPORT_ERROR}")
 
-LOG_TESTS = ["cop", "code-in-io", "dpcr", "otc-test", "gp0-e1", "mask-bit", "test-all"]
+LOG_TESTS = ["cop", "code-in-io", "dpcr", "otc-test", "gp0-e1", "mask-bit", "test-all", "memory-transfer"]
 VRAM_TESTS = ["rectangles", "triangle", "transparency", "quad", "4bit", "8bit", "frame-15bit-dma"]
-# the bundled otc-test.exe is a newer build than its psx.log: it runs two more
-# sub-tests, so its log is checked as "every console line appears, in order"
-NEWER_THAN_LOG = {"otc-test", "test-all"}
+# these EXEs are newer builds than their psx.log: they run more sub-tests, so the log
+# is checked as "every console line appears, in order"
+NEWER_THAN_LOG = {"otc-test", "test-all", "memory-transfer"}
 
 
 def _run(name: str, frames: int = 1500):
@@ -232,3 +232,75 @@ def test_gte_matches_hardware_fuzz_log():
         if gte_exec(regs, word) != want:
             bad.append(name)
     assert not bad, f"{len(bad)} GTE commands differ: {sorted(set(bad))}"
+
+
+@needs_core
+def test_spu_voices_play_and_pan():
+    """spu/stereo: four ADPCM samples, keyed one at a time hard left / hard right every
+    2 s, then two at once on opposite sides. No console recording exists, so check the
+    layout of the sound: who is heard on which side, and when."""
+    import array
+    m = ps1.Ps1(exe=(ROMS / "stereo" / "stereo.exe").read_bytes())
+    m.sampling = True
+    a = array.array("h")
+    for _ in range(530):
+        m.run_frame()
+        a.frombytes(bytes(m.take_samples()))
+    tty = m.take_tty().decode("latin-1")
+    assert tty.count("[SPU] Upload 18192 bytes") == 4
+
+    def rms(t0, t1, ch):
+        part = a[int(t0 * 44100) * 2 + ch:int(t1 * 44100) * 2:2]
+        return (sum(x * x for x in part) / len(part)) ** 0.5
+
+    # (start, end, left heard, right heard); the samples last ~1.2 s of each 2 s slot
+    for t0, t1, left, right in [(0.1, 0.9, True, False), (2.1, 2.9, False, True), (4.1, 4.9, True, False),
+                                (6.1, 6.9, False, True), (8.1, 8.6, True, True)]:
+        rl, rr = rms(t0, t1, 0), rms(t0, t1, 1)
+        assert (rl > 1000) == left and (rr > 1000) == right, (t0, rl, rr)
+        assert (rl == 0) != left and (rr == 0) != right, (t0, rl, rr)
+    assert rms(1.6, 1.9, 0) == rms(1.6, 1.9, 1) == 0          # the one-shot sample ended
+
+
+@needs_core
+def test_spu_decode_matches_an_independent_decoder():
+    """The voice output follows the ADPCM data: decode the uploaded sample with a plain
+    psx-spx decoder, resample it at the voice pitch and correlate with what the SPU played."""
+    import array
+    m = ps1.Ps1(exe=(ROMS / "stereo" / "stereo.exe").read_bytes())
+    m.sampling = True
+    a = array.array("h")
+    for _ in range(110):
+        m.run_frame()
+        a.frombytes(bytes(m.take_samples()))
+    ram = bytes(m.spu_ram())
+    pos, neg = [0, 60, 115, 98, 122], [0, 0, -52, -55, -60]
+    src, o1, o2, addr = [], 0, 0, 0x1000
+    while True:
+        sh, f, flags = ram[addr] & 15, ram[addr] >> 4, ram[addr + 1]
+        for i in range(28):
+            n = (ram[addr + 2 + i // 2] >> ((i & 1) * 4)) & 15
+            s = ((n << 12) - 0x10000 if n & 8 else n << 12) >> sh
+            s = max(-32768, min(32767, s + ((o1 * pos[f]) >> 6) + ((o2 * neg[f]) >> 6)))
+            src.append(s)
+            o2, o1 = o1, s
+        addr += 16
+        if flags & 1:
+            break
+    left = a[0::2]
+    start = next(i for i, x in enumerate(left) if x)
+    step = 2205 / 4096                    # the test's pitch register
+    ref = []
+    for k in range(20000):
+        t = k * step
+        i = int(t)
+        ref.append(src[i] + (src[i + 1] - src[i]) * (t - i))
+
+    def corr(x, y):
+        n = len(x)
+        mx, my = sum(x) / n, sum(y) / n
+        sxy = sum((p - mx) * (q - my) for p, q in zip(x, y))
+        return sxy / (sum((p - mx) ** 2 for p in x) * sum((q - my) ** 2 for q in y)) ** 0.5
+
+    best = max(corr(ref, left[start + d:start + d + len(ref)]) for d in range(-4, 6) if start + d >= 0)
+    assert best > 0.99, best

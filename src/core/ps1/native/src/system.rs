@@ -6,11 +6,10 @@ use crate::hle::Hle;
 
 pub const CPU_HZ: u32 = 33_868_800;
 pub const SAMPLE_RATE: u32 = 44_100;
-const CYCLES_PER_SAMPLE: u32 = CPU_HZ / SAMPLE_RATE; // 768
 const BATCH: u32 = 64; // cycles between device updates
 const SHELL_ENTRY: u32 = 0x8003_0000;
 /// Bumped whenever the state layout changes (a state from another layout is refused).
-const STATE_MAGIC: &[u8] = b"PS1STATE\x01";
+const STATE_MAGIC: &[u8] = b"PS1STATE\x02";
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Exe {
@@ -49,7 +48,6 @@ pub struct System {
     pub hle: Option<Hle>,
     exe: Option<Exe>,
     video_frac: u32,
-    sample_frac: u32,
     #[serde(skip)]
     pub sampling: bool,
     #[serde(skip)]
@@ -74,7 +72,6 @@ impl System {
             hle: None,
             exe,
             video_frac: 0,
-            sample_frac: 0,
             sampling: false,
             samples: Vec::new(),
             cycles: 0,
@@ -210,12 +207,10 @@ impl System {
             bus.raise(irq::CDROM);
         }
         bus.collect_gpu_irq();
-        // audio: silence until the SPU voices land, at the right rate
-        let s = self.sample_frac + cycles;
-        let n = s / CYCLES_PER_SAMPLE;
-        self.sample_frac = s % CYCLES_PER_SAMPLE;
-        if self.sampling && n > 0 {
-            self.samples.resize(self.samples.len() + 2 * n as usize, 0);
+        bus.tick_dma(cycles);
+        bus.spu.tick(cycles, if self.sampling { Some(&mut self.samples) } else { None });
+        if std::mem::take(&mut bus.spu.irq) {
+            bus.raise(irq::SPU);
         }
     }
 }

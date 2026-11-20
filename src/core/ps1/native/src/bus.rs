@@ -8,6 +8,7 @@ use crate::timers::Timers;
 
 pub const RAM_SIZE: usize = 2 * 1024 * 1024;
 pub const BIOS_SIZE: usize = 512 * 1024;
+const SPU_DMA_CYCLES_PER_WORD: u32 = 48;
 
 pub mod irq {
     pub const VBLANK: u32 = 1 << 0;
@@ -50,9 +51,11 @@ pub struct Bus {
     pub tty: Vec<u8>,
     pub post: u8,
     stall: u32,
-    /// CPU cycles not yet applied to the timers.
     #[serde(skip)]
     dma_pending_mdec_out: bool,
+    /// Cycles until a running block-mode SPU DMA reports completion (the CPU runs meanwhile).
+    dma_busy: [u32; 7],
+    /// CPU cycles not yet applied to the timers.
     pub timer_lag: u32,
     timer_dot_frac: u32,
     timer_video_frac: u32,
@@ -89,6 +92,7 @@ impl Bus {
             post: 0,
             stall: 0,
             dma_pending_mdec_out: false,
+            dma_busy: [0; 7],
             timer_lag: 0,
             timer_dot_frac: 0,
             timer_video_frac: 0,
@@ -408,8 +412,11 @@ impl Bus {
         let c = self.dma[ch].chcr;
         let enabled = (self.dpcr >> (ch * 4 + 3)) & 1 != 0;
         let sync = (c >> 9) & 3;
-        let start = c & (1 << 24) != 0 && (sync != 0 || c & (1 << 28) != 0);
-        if !(start && enabled) {
+        // Sync mode 0 needs the manual trigger (bit 28) unless the device itself requests DMA:
+        // the SPU in a DMA transfer mode does (seen on hardware, ps1-tests PR #2).
+        let request = ch == 4 && self.spu.dma_request();
+        let start = c & (1 << 24) != 0 && (sync != 0 || c & (1 << 28) != 0 || request);
+        if !(start && enabled) || self.dma_busy[ch] > 0 {
             return;
         }
         if ch == 1 {
@@ -419,10 +426,38 @@ impl Bus {
                 return;
             }
         }
+        let words = self.dma_words(ch);
         if sync == 2 {
             self.dma_linked(ch);
         } else {
             self.dma_block(ch);
+        }
+        if ch == 4 && sync == 1 {
+            // SPU block DMA goes one block per SPU request: the data is in place at once, but
+            // the channel stays busy (CPU running) for the transfer time. Real consoles take
+            // ~16 cycles per byte here (ps1-tests spu/memory-transfer accepts 10%..110% of that).
+            self.dma_busy[ch] = words.max(1) * SPU_DMA_CYCLES_PER_WORD;
+            self.spu.transfer_busy = true;
+            return;
+        }
+        self.dma_finish(ch);
+    }
+
+    /// Advance running DMA transfers by `cycles`.
+    pub fn tick_dma(&mut self, cycles: u32) {
+        for ch in 0..7 {
+            if self.dma_busy[ch] > 0 {
+                self.dma_busy[ch] = self.dma_busy[ch].saturating_sub(cycles);
+                if self.dma_busy[ch] == 0 {
+                    self.dma_finish(ch);
+                }
+            }
+        }
+    }
+
+    fn dma_finish(&mut self, ch: usize) {
+        if ch == 4 {
+            self.spu.transfer_busy = false;
         }
         let ch_c = &mut self.dma[ch];
         ch_c.chcr &= !((1 << 24) | (1 << 28));
