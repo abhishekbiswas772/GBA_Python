@@ -38,3 +38,22 @@ def is_exe(path) -> bool:
             return f.read(8) == EXE_MAGIC
     except OSError:
         return False
+
+
+class Ps1Core:
+    """The running machine as save states see it: the Rust object plus the images it
+    booted from. Pickling stores ``Ps1.save_state()`` bytes; the BIOS and EXE are
+    passed by reference (``Machine.state_blobs``), so a state never contains them."""
+
+    def __init__(self, bios: bytes | None, exe: bytes):
+        self.bios = bios
+        self.exe = exe
+        self.ps1 = Ps1(bios=bios, exe=exe)
+
+    def __getstate__(self) -> dict:
+        return {"bios": self.bios, "exe": self.exe, "state": bytes(self.ps1.save_state())}
+
+    def __setstate__(self, d: dict) -> None:
+        self.bios, self.exe = d["bios"], d["exe"]
+        self.ps1 = Ps1(bios=self.bios, exe=self.exe)
+        self.ps1.load_state(d["state"])

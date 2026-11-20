@@ -246,7 +246,7 @@ def _play_ps1(args, headless: bool) -> None:
     except KeyboardInterrupt:
         print("\n[Stopped by user]")
     secs = time.time() - t0
-    n = m.core.frames
+    n = m.core.ps1.frames
     print(f"\n{n:,} frames in {secs:.1f}s ({n / max(secs, 1e-9) / m.fps * 100:.0f}% speed)")
 
 

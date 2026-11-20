@@ -38,6 +38,16 @@ mod python {
             System::new(bios, exe).map(|sys| Ps1 { sys }).map_err(PyValueError::new_err)
         }
 
+        /// Machine state as bytes (no BIOS inside).
+        fn save_state<'py>(&self, py: Python<'py>) -> Bound<'py, PyBytes> {
+            PyBytes::new(py, &self.sys.save_state())
+        }
+
+        /// Restore bytes from `save_state` into this machine.
+        fn load_state(&mut self, data: &[u8]) -> PyResult<()> {
+            self.sys.load_state(data).map_err(PyValueError::new_err)
+        }
+
         /// Emulate one video frame (the GIL is released while it runs).
         fn run_frame(&mut self, py: Python<'_>) {
             let sys = &mut self.sys;

@@ -9,7 +9,10 @@ pub const SAMPLE_RATE: u32 = 44_100;
 const CYCLES_PER_SAMPLE: u32 = CPU_HZ / SAMPLE_RATE; // 768
 const BATCH: u32 = 64; // cycles between device updates
 const SHELL_ENTRY: u32 = 0x8003_0000;
+/// Bumped whenever the state layout changes (a state from another layout is refused).
+const STATE_MAGIC: &[u8] = b"PS1STATE\x01";
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Exe {
     pub pc: u32,
     pub gp: u32,
@@ -39,6 +42,7 @@ impl Exe {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct System {
     pub cpu: Cpu,
     pub bus: Bus,
@@ -46,7 +50,9 @@ pub struct System {
     exe: Option<Exe>,
     video_frac: u32,
     sample_frac: u32,
+    #[serde(skip)]
     pub sampling: bool,
+    #[serde(skip)]
     pub samples: Vec<i16>,
     pub cycles: u64,
 }
@@ -105,6 +111,24 @@ impl System {
         self.cpu.write_reg(29, exe.sp);
         self.cpu.write_reg(30, exe.sp);
         self.cpu.set_pc(exe.pc);
+    }
+
+    /// The whole machine state (minus the BIOS image), versioned.
+    pub fn save_state(&self) -> Vec<u8> {
+        let mut out = STATE_MAGIC.to_vec();
+        out.extend(bincode::serialize(self).expect("state serializes"));
+        out
+    }
+
+    /// Replace this machine with `data` from [`save_state`]; keeps the BIOS, the
+    /// sampling switch and drops buffered audio.
+    pub fn load_state(&mut self, data: &[u8]) -> Result<(), String> {
+        let body = data.strip_prefix(STATE_MAGIC).ok_or("not a PS1 state (or from another core version)")?;
+        let mut new: System = bincode::deserialize(body).map_err(|e| format!("bad PS1 state: {e}"))?;
+        new.bus.bios = std::mem::take(&mut self.bus.bios);
+        new.sampling = self.sampling;
+        *self = new;
+        Ok(())
     }
 
     pub fn fps(&self) -> f64 {

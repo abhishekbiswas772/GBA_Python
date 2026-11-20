@@ -2,7 +2,7 @@
 //! Voices and mixing come in a later milestone (milestone 4); it outputs silence
 //! at 44.1 kHz so the audio pipeline and recordings already run.
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Spu {
     pub regs: Vec<u16>,
     pub ram: Vec<u8>,

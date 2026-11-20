@@ -12,7 +12,7 @@ pub const CLOCKS_PER_LINE_PAL: u32 = 3406;
 
 const DITHER: [[i32; 4]; 4] = [[-4, 0, -3, 1], [2, -2, 3, -1], [-3, 1, -4, 0], [3, -1, 2, -2]];
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
 struct Vtx {
     x: i32,
     y: i32,
@@ -23,7 +23,7 @@ struct Vtx {
     v: i32,
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
 struct Tex {
     page_x: u32,
     page_y: u32,
@@ -32,7 +32,7 @@ struct Tex {
     clut_y: u32,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 struct Transfer {
     x: u32,
     y: u32,
@@ -54,7 +54,7 @@ impl Transfer {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Gpu {
     pub vram: Vec<u16>,
     // drawing environment

@@ -2,7 +2,7 @@
 //! The geometry commands themselves come in a later milestone (milestone 3);
 //! for now `command` only clears FLAG so code that polls it keeps running.
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Gte {
     pub data: [u32; 32],
     pub ctrl: [u32; 32],

@@ -34,7 +34,7 @@ const T_LO: u32 = 0x90;
 const T_SR: u32 = 0x94;
 const T_CAUSE: u32 = 0x98;
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Hle {
     custom_exit: u32,
     clear_rcnt: [bool; 4],

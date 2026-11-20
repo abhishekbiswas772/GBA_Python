@@ -4,7 +4,7 @@
 
 use std::collections::VecDeque;
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Cdrom {
     index: u8,
     params: VecDeque<u8>,

@@ -38,9 +38,6 @@ def thumb_path(rom_path: str) -> Path:
     return d / (hashlib.sha1(rom_path.encode()).hexdigest()[:16] + ".png")
 
 
-NO_STATES = {"PS1"}          # systems whose core can't snapshot yet
-
-
 class _RunnerSink:
     """Router sink: every press / release goes to the worker's input queue."""
 
@@ -273,11 +270,9 @@ class EmulatorSession:
 
     @property
     def supports_states(self) -> bool:
-        """False for a core without save states yet (PS1): no slots, resume point or rewind."""
+        """False for a core that can't snapshot (no slots, resume point or rewind)."""
         m = self.machine
-        if m is not None:
-            return bool(getattr(m, "supports_states", True))
-        return self.game.system not in NO_STATES
+        return bool(getattr(m, "supports_states", True)) if m is not None else True
 
     async def save_state(self, slot: int) -> dict:
         """Save the current moment to `slot` (0 = the resume point). Runs on the emulator thread."""

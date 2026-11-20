@@ -211,7 +211,8 @@ Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest fi
 | Screenshots | ✅ |
 | Recording and clip of the last 30 s, as MP4 with sound or GIF | ✅ |
 | PlayStation: PS-X EXE programs (CPU, GPU, DMA, timers, pad) | 🧪 experimental, Rust core |
-| PlayStation: CD games, 3D (GTE), sound (SPU), memory cards, save states | 🚧 next milestones |
+| PlayStation: save states and rewind | ✅ |
+| PlayStation: CD games, 3D (GTE), sound (SPU), memory cards | 🚧 next milestones |
 | Cheats, achievements, link play | 🚧 UI preview, not in the cores yet |
 
 ---
@@ -247,11 +248,11 @@ Without that step the rest of the app is unchanged. PS1 games show up in the lib
 | Digital pad (SIO) | ✅ |
 | Boot without a BIOS: a small HLE kernel (exceptions, events, TTY, `printf`, pads) | ✅ runs every bundled test |
 | Boot with your own BIOS (**Settings → BIOS & firmware**), EXE sideloaded at the shell | ⚠️ implemented, not yet tested against a real BIOS |
-| Save states and rewind | 🚧 not yet: the save prompt, slots and rewind are switched off for PS1 games |
+| Save states, resume point and rewind | ✅ the Rust core serializes itself (serde + bincode, ~3.6 MB raw, ~90 KB compressed); replay after a load is bit-identical |
 | CD-ROM (`.cue` / `.bin`) | 🚧 milestone 2 |
 | GTE (3D maths coprocessor) | 🚧 milestone 3: registers only, commands are stubs |
 | SPU (sound) | 🚧 milestone 4: registers and RAM only, output is silence |
-| Memory cards, MDEC (video), save states and rewind | 🚧 later |
+| Memory cards, MDEC (video) | 🚧 later |
 
 **Accuracy.** Checked against real-console output from [JaCzekanski's ps1-tests](https://github.com/JaCzekanski/ps1-tests) (MIT). Ten of them are bundled in `tests/roms/ps1` with their hardware logs and VRAM dumps:
 
@@ -520,7 +521,7 @@ Push a tag like `v0.2.0` and GitHub Actions builds both apps and publishes them 
 ## 🧭 Honest limits
 
 - Cheats, achievements and link play are UI previews for now; the cores don't implement them yet.
-- The PS1 core is experimental: PS-X EXE programs only, no sound, no 3D maths, no save states or rewind yet. Booting through a real BIOS is implemented but untested. CI and packaged builds don't compile it yet, so it is available when you build from source.
+- The PS1 core is experimental: PS-X EXE programs only, no sound and no 3D maths yet. Booting through a real BIOS is implemented but untested. CI and packaged builds don't compile it yet, so it is available when you build from source.
 - Sound uses SDL through pygame, so it works in the desktop app only.
 - The NES core is NTSC only. PAL and mappers beyond the ones listed above are welcome contributions.
 

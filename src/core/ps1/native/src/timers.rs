@@ -1,7 +1,7 @@
 //! Root counters (timers 0-2): sysclk / dotclock / hblank / sysclk÷8 sources,
 //! target and overflow IRQs, and the vblank/hblank sync modes.
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
 pub struct Timer {
     pub counter: u32,
     pub mode: u32,
@@ -11,7 +11,7 @@ pub struct Timer {
     frac: u32,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Timers {
     pub t: [Timer; 3],
     pub irq: u32,

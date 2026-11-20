@@ -19,17 +19,19 @@ pub mod irq {
     pub const SPU: u32 = 1 << 9;
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
 pub struct DmaChan {
     pub madr: u32,
     pub bcr: u32,
     pub chcr: u32,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Bus {
     pub ram: Vec<u8>,
+    #[serde(skip)] // passed in again on load (never stored in a state)
     pub bios: Vec<u8>,
-    pub scratch: [u8; 1024],
+    pub scratch: Vec<u8>,
     pub memctrl: [u32; 9],
     pub ram_size: u32,
     pub cache_ctrl: u32,
@@ -66,7 +68,7 @@ impl Bus {
         Bus {
             ram: vec![0; RAM_SIZE],
             bios: b,
-            scratch: [0; 1024],
+            scratch: vec![0; 1024],
             memctrl: [0; 9],
             ram_size: 0x0000_0B88,
             cache_ctrl: 0,

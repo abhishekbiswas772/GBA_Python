@@ -26,7 +26,7 @@ pub enum Exc {
 /// SWC3 encoding, so it is honoured only there and only while the HLE kernel runs.
 pub const HLE_TRAP: u32 = 0xEC00_0000;
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Cpu {
     pub regs: [u32; 32],
     pub pc: u32,

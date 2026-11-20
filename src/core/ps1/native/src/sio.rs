@@ -6,7 +6,7 @@
 
 pub const ACK_DELAY: i32 = 500; // CPU cycles from the end of a byte to the IRQ
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Sio {
     pub ctrl: u16,
     pub mode: u16,

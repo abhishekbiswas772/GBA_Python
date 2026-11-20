@@ -139,8 +139,8 @@ def test_runs_in_the_real_runner(tmp_path):
         time.sleep(1.5)
         assert r.error is None, r.error
         assert r.frames > 30
-        assert r.rewind is None                      # no snapshots: rewind is off, not crashing
-        assert r.submit(lambda m: m.supports_states).result(5) is False
+        assert r.rewind is not None and len(r.rewind) > 0, "rewind history builds up"
+        assert r.submit(lambda m: m.supports_states).result(5) is True
         r.press("A")
         r.release("A")
         r.set_paused(True)
@@ -151,3 +151,62 @@ def test_runs_in_the_real_runner(tmp_path):
         assert r.error is None, r.error
     finally:
         r.close()
+
+
+def _fingerprint(m) -> str:
+    import hashlib
+    ps1 = m.core.ps1
+    return hashlib.sha1(ps1.vram() + bytes(ps1.save_state()) + bytes(m.tty)).hexdigest()
+
+
+@needs_core
+def test_save_states_replay_exactly(tmp_path):
+    """Snapshot, run on, go back, run the same frames again: identical machine, in memory and on disk."""
+    from src.bridge import load, savestate
+    m = load(ROMS / "triangle" / "triangle.exe")
+    for _ in range(20):
+        m.run_frame()
+    snap = savestate.capture(m)
+    f = tmp_path / "s.state"
+    savestate.save_file(m, f)
+    assert m.core.exe not in snap.data and len(snap.data) < 1_000_000   # EXE kept out, compressed
+    m.tty.clear()
+    for _ in range(15):
+        m.run_frame()
+    want = _fingerprint(m)
+    savestate.restore(m, snap)                       # in place (rewind, this session's slots)
+    m.tty.clear()
+    for _ in range(15):
+        m.run_frame()
+    assert _fingerprint(m) == want
+    savestate.load_file(m, f)                        # from disk, restricted unpickler
+    m.tty.clear()
+    for _ in range(15):
+        m.run_frame()
+    assert _fingerprint(m) == want
+
+
+@needs_core
+def test_state_from_another_game_is_refused(tmp_path):
+    from src.bridge import load, savestate
+    a = load(ROMS / "triangle" / "triangle.exe")
+    a.run_frame()
+    f = tmp_path / "a.state"
+    savestate.save_file(a, f)
+    b = load(ROMS / "quad" / "quad.exe")
+    with pytest.raises(ValueError, match="different game"):
+        savestate.load_file(b, f)
+
+
+@needs_core
+def test_audio_follows_a_loaded_state(tmp_path):
+    from src.bridge import load, savestate
+    m = load(ROMS / "triangle" / "triangle.exe")
+    m.apu.sampling = True
+    m.run_frame()
+    f = tmp_path / "s.state"
+    savestate.save_file(m, f)
+    savestate.load_file(m, f)
+    m.apu.take_samples()
+    m.run_frame()
+    assert m.apu.sampling and len(m.apu.take_samples()) > 1000     # the new core is the one heard
