@@ -1,4 +1,4 @@
-"""About us: who makes the app, what it believes in, what's inside and where it's heading."""
+"""About me: who makes the app, why, what's inside and where it's heading."""
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from src.ui.app import App
 
 CREATOR = "Abhishek Biswas"
+ALIAS = "Simple772"
 REPO = "https://github.com/abhishekbiswas772/RetroPy"
 
 VALUES = [
@@ -29,8 +30,9 @@ FEATURES = [
     ("Open source", "MIT licensed. Read the code, file an issue or send a pull request."),
 ]
 ROADMAP = [
-    ("Now", ["GB, GBC, GBA and NES support", "Moments: record, clip and share", "Themes and screen shaders"]),
-    ("Next", ["Online link play", "Achievements in supported games", "Controller presets for more pads"]),
+    ("Now", ["GB, GBC, GBA and NES support", "Moments: record, clip and share", "Themes and screen shaders",
+             "Experimental PlayStation core (Rust)"]),
+    ("Next", ["PlayStation CD-ROM and memory cards", "Nintendo DS core in Rust", "Online link play"]),
     ("Later", ["Built-in debugger for homebrew devs", "Cloud save sync", "Your idea here: open an issue"]),
 ]
 
@@ -50,8 +52,8 @@ def build(app: "App") -> ft.Control:
     )
 
     intro = ft.Column([
-        c.mono("About us", size=13, color=t.accent),
-        c.heading("Made by one player who missed the Game Boy.", t, 60 if wide else 36),
+        c.mono("About me", size=13, color=t.accent),
+        c.heading("Built from scratch by a backend and AI engineer who loves games.", t, 60 if wide else 36),
         c.text(f"{name} is a desktop emulator for Game Boy, Game Boy Color, Game Boy Advance and NES games, "
                "with an experimental PlayStation core — built to feel like the handheld you remember, "
                "with the tools you'd want today.", size=20 if wide else 16, color=t.sub),
@@ -62,19 +64,46 @@ def build(app: "App") -> ft.Control:
         ft.Container(c.text(initials, size=56, weight=700, color=t.on), width=160, height=160, border_radius=32,
                      bgcolor=t.accent, alignment=ft.Alignment.CENTER),
         ft.Column([c.text(CREATOR, size=22, weight=600, color=t.text),
-                   c.text("Creator & solo developer", size=14, color=t.muted)], spacing=2, tight=True),
+                   c.text(f"aka {ALIAS}", size=15, weight=500, color=t.accent),
+                   c.text("Backend & AI engineer", size=14, color=t.muted),
+                   c.text("Kolkata → Gurugram", size=14, color=t.muted)], spacing=2, tight=True),
     ], spacing=16, tight=True)
+
+    def section(title: str, *paras: str | list[str]) -> ft.Column:
+        rows: list[ft.Control] = [c.heading(title, t, 24)]
+        for para in paras:
+            if isinstance(para, list):
+                rows += [ft.Row([c.text("•", color=t.accent), c.text(x, size=16, color=t.sub, expand=True)],
+                                spacing=10, vertical_alignment=ft.CrossAxisAlignment.START) for x in para]
+            else:
+                rows.append(c.text(para, size=16, color=t.sub))
+        return ft.Column(rows, spacing=10)
+
     story = ft.Column([
-        h2("Why I built this", 30),
-        c.text("I grew up with a handheld in my school bag. Years later, I wanted to replay those games on my "
-               "laptop — but every emulator I tried felt like a settings panel first and a game second.",
-               size=16, color=t.sub),
-        c.text(f"So I started {name} as a side project: a clean library, instant save states, and a one-key "
-               "way to clip the moment you finally beat that boss. It grew from there.", size=16, color=t.sub),
-        c.text("It's still built by one person, in the evenings, with a lot of help from players who send bug "
-               "reports and ideas. If you're one of them — thank you.", size=16, color=t.sub),
-        c.text(f"— {CREATOR.split()[0]}", size=18, weight=600, color=t.text),
-    ], spacing=18, expand=wide)
+        section("Hi, I'm Abhishek",
+                "I'm a backend and AI engineer from Kolkata, now working in Gurugram. By day I build production "
+                "AI systems: RAG pipelines, AI agents and chatbots in Python. By night I build things I love, "
+                "and this emulator is one of them."),
+        section("Why I built this",
+                "I've always loved games, anime and Japanese culture, and I wanted a modern way to play GB, GBC "
+                "and GBA games on my desktop: a clean library, save states, themes, and a quick way to clip and "
+                "share great moments."),
+        section("What's under the hood", [
+            "Emulator cores for NES, GB, GBC and GBA, written in pure Python using only the standard library "
+            "(no NumPy).",
+            "A bridge/adapter layer between the cores and the UI, so new consoles plug in without rewriting "
+            "the app.",
+            f"Open source: {REPO.removeprefix('https://')}",
+        ]),
+        section("What's next",
+                "A PlayStation core in Rust, connected to Python through the same bridge (already running "
+                "test programs, experimental), and a Nintendo DS core after it."),
+        section("Beyond this project",
+                "I hold an M.Tech from IIT Kharagpur and have published research papers, including COMA: Context "
+                "Memory Allocator and LocalMind, a RAG system that runs in the browser. I like building things "
+                "from scratch."),
+        c.text(f"— {CREATOR.split()[0]} ({ALIAS})", size=18, weight=600, color=t.text),
+    ], spacing=28, expand=wide)
     creator = ft.Container(
         ft.Row([creator_card, story], spacing=48, vertical_alignment=ft.CrossAxisAlignment.START) if wide
         else ft.Column([creator_card, story], spacing=28),
