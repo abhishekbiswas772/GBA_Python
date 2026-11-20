@@ -24,7 +24,7 @@ ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 # set by run() from the command line: session-only ROM folders / a ROM to open at start
 LAUNCH: dict = {"rom": None, "dirs": []}
 
-ROUTES = ("library", "player", "settings", "moments", "appearance", "together")
+ROUTES = ("library", "player", "settings", "moments", "appearance", "together", "onboarding", "about")
 MOBILE = {ft.PagePlatform.ANDROID, ft.PagePlatform.IOS, ft.PagePlatform.ANDROID_TV}
 
 
@@ -317,6 +317,8 @@ async def main(page: ft.Page) -> None:
     await asyncio.sleep(0.45)
     loader.stop()
     app.ready = True
+    if not settings.onboarded and not LAUNCH.get("rom"):
+        app.route = "onboarding"              # first launch: set up profile, folders and look
     app.render()
     rom = LAUNCH.get("rom")
     if rom:

@@ -9,7 +9,8 @@ import flet as ft
 from src.ui import components as c
 from src.ui.data import samples
 from src.ui.data.settings import (CONSOLE_BUTTONS, GAMEPAD_LAYOUT, GBA_ONLY, HOTKEYS, SYSTEMS, Settings,
-                                  buttons_for, data_dir)
+                                  buttons_for, data_dir, default_save_dir)
+from src.ui.theme import family
 from src.ui.views.player import norm_key
 
 if TYPE_CHECKING:
@@ -65,6 +66,8 @@ def build(app: "App") -> ft.Control:
         content = _paths(app)
     elif section == "BIOS & firmware":
         content = _bios(app)
+    elif section == "General":
+        content = _general(app)
     else:
         content = [
             c.heading(section, t, 28),
@@ -303,39 +306,114 @@ def _paths(app: "App") -> list[ft.Control]:
         app.rescan()
         app.render()
 
+    def edit_rom_dir(old: str, new: str) -> None:
+        new = new.strip()
+        if not new or new == old or old not in s.rom_dirs:
+            return
+        if new in s.rom_dirs:
+            s.rom_dirs.remove(old)
+        else:
+            s.rom_dirs[s.rom_dirs.index(old)] = new
+        s.save()
+        app.rescan()
+        app.render()
+
+    def browse_rom_dir(old: str):
+        async def browse(e) -> None:
+            if app.is_web:
+                app.toast("Folders can be changed in the desktop app.")
+                return
+            path = await ft.FilePicker().get_directory_path(dialog_title="Choose a ROM folder")
+            if path:
+                edit_rom_dir(old, path)
+        return browse
+
+    def reset_rom_dirs(e) -> None:
+        s.rom_dirs = Settings.default_rom_dirs()
+        s.save()
+        app.rescan()
+        app.render()
+
+    def type_save_dir(value: str) -> None:
+        value = value.strip()
+        if value == (s.save_dir or str(s.save_folder())):
+            return
+        old = s.save_dir
+        s.save_dir = "" if not value or value == str(default_save_dir()) else value
+        if s.apply_save_dir() is None:
+            app.toast("Can't use that folder; saves stay where they were.")
+            s.save_dir = old
+            s.apply_save_dir()
+        s.save()
+        app.render()
+
+    def path_field(value: str, on_submit) -> ft.TextField:
+        return ft.TextField(
+            value=value, on_submit=lambda e: on_submit(e.control.value),
+            on_blur=lambda e: on_submit(e.control.value),
+            dense=True, filled=True, fill_color=t.panel, bgcolor=t.panel, border_color=t.line2,
+            focused_border_color=t.accent, border_radius=8, cursor_color=t.accent, expand=True,
+            content_padding=c.pad(10, 10),
+            text_style=ft.TextStyle(size=13, color=t.text, font_family=family("mono")),
+        )
+
     rows = []
     for d in s.rom_dirs:
         exists = Path(d).expanduser().is_dir()
         rows.append(c.card(ft.Row([
             c.icon(ft.Icons.FOLDER_OPEN, t.muted, 18),
-            ft.Column([c.mono(d, size=13, color=t.text),
+            ft.Column([path_field(d, lambda v, p=d: edit_rom_dir(p, v)),
                        c.text("Scanned for .gb, .gbc, .gba, .nes and PS-X .exe files" if exists
                               else "Folder not found",
-                              size=12, color=t.muted)], spacing=2, tight=True, expand=True),
+                              size=12, color=t.muted)], spacing=6, tight=True, expand=True),
+            c.button("Browse…", browse_rom_dir(d), t, height=40, h_pad=14, radius=8),
             c.icon_button(ft.Icons.CLOSE, lambda e, p=d: remove(p), t, "Remove folder"),
         ], spacing=12), t, padding=c.pad(14, 10), radius=12))
     if not rows:
         rows.append(c.text("No folders yet.", color=t.muted))
+    custom_roms = s.rom_dirs != Settings.default_rom_dirs()
     return [
         ft.Column([c.heading("Paths & saves", t, 28),
-                   c.text("Battery saves get one folder per game: saves / console / game / game.sav.",
-                          color=t.muted)], spacing=6),
+                   c.text("Type a path and press Enter, or browse. Battery saves get one folder per game: "
+                          "saves / console / game / game.sav.", color=t.muted)], spacing=6),
         c.eyebrow("ROM folders", t),
         ft.Column(rows, spacing=10),
         ft.Row([c.button("Add folder", add_folder, t, variant="primary", icon_name=ft.Icons.ADD),
-                c.button("Open app data", lambda e: app.open_folder(data_dir()), t)], spacing=10, wrap=True),
+                c.button("Open app data", lambda e: app.open_folder(data_dir()), t)]
+               + ([c.button("Use default", reset_rom_dirs, t, variant="ghost")] if custom_roms else []),
+               spacing=10, wrap=True),
         c.eyebrow("Save folder", t),
         c.card(ft.Row([
             c.icon(ft.Icons.SAVE_OUTLINED, t.muted, 18),
-            ft.Column([c.mono(str(s.save_folder()), size=13, color=t.text),
+            ft.Column([path_field(str(s.save_folder()), type_save_dir),
                        c.text("Custom folder" if s.save_dir else "Default folder", size=12, color=t.muted)],
-                      spacing=2, tight=True, expand=True),
+                      spacing=6, tight=True, expand=True),
         ], spacing=12), t, padding=c.pad(14, 10), radius=12),
         ft.Row([c.button("Change save folder", pick_save_dir, t, icon_name=ft.Icons.DRIVE_FOLDER_UPLOAD),
                 c.button("Open save folder", lambda e: app.open_folder(s.apply_save_dir() or s.save_folder()), t)]
                + ([c.button("Use default", reset_save_dir, t, variant="ghost")] if s.save_dir else []),
                spacing=10, wrap=True),
         c.text(f"Settings, thumbnails and moments: {data_dir()}", size=12, color=t.muted, selectable=True),
+    ]
+
+
+# -------------------------------------------------------------------- general
+def _general(app: "App") -> list[ft.Control]:
+    t, s = app.t, app.settings
+    from src.ui.views.onboarding import avatar
+    name = s.player_name or "Player"
+    return [
+        ft.Column([c.heading("General", t, 28),
+                   c.text("Your player profile and first-run setup.", color=t.muted)], spacing=6),
+        c.card(ft.Row([
+            avatar(s.player_name, s.avatar_color, 56),
+            ft.Column([c.text(name, size=16, weight=600, color=t.text),
+                       c.mono(s.player_tag or "No player tag", size=12, color=t.muted)],
+                      spacing=2, tight=True, expand=True),
+            c.button("Run setup again", lambda e: app.go("onboarding"), t, variant="primary"),
+        ], spacing=16, vertical_alignment=ft.CrossAxisAlignment.CENTER), t, padding=c.pad(18, 14), radius=12),
+        ft.Row([c.button("About RetroPy", lambda e: app.go("about"), t, icon_name=ft.Icons.INFO_OUTLINE)],
+               spacing=10),
     ]
 
 

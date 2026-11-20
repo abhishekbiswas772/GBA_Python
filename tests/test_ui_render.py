@@ -79,11 +79,36 @@ def app(tmp_path, monkeypatch):
     return a
 
 
-@pytest.mark.parametrize("route", ["library", "settings", "appearance", "moments", "together"])
+@pytest.mark.parametrize("route", ["library", "settings", "appearance", "moments", "together", "onboarding",
+                                   "about"])
 def test_screens_validate(app, route):
     from src.ui.views import VIEWS
     app.route = route
     _walk(VIEWS[route](app), set())
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+@pytest.mark.parametrize("step", [1, 2, 3, 4, 5])
+def test_onboarding_steps_validate(app, step, width, monkeypatch):
+    from src.ui.views import VIEWS, onboarding
+    monkeypatch.setitem(onboarding._state, "step", step)
+    app.page.width = width
+    app.route = "onboarding"
+    _walk(VIEWS["onboarding"](app), set())
+    if step == 1:
+        app.route = "about"
+        _walk(VIEWS["about"](app), set())
+
+
+def test_first_run_needs_onboarding(tmp_path, monkeypatch):
+    monkeypatch.setenv("FLET_APP_STORAGE_DATA", str(tmp_path / "data"))
+    from src.ui.data.settings import Settings
+    assert not Settings.load().onboarded                  # nothing saved yet: show setup
+    s = Settings()
+    s.save()
+    assert Settings.load().onboarded is False             # saved mid-setup: still not done
+    Settings.path().write_text('{"theme": "berry"}', encoding="utf-8")
+    assert Settings.load().onboarded                      # settings from an older version: skip setup
 
 
 @pytest.mark.parametrize("section", ["General", "Emulation", "Audio", "Controls", "BIOS & firmware",

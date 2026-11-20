@@ -93,6 +93,7 @@ def build(app: "App") -> ft.Control:
     bottom = [
         c.nav_item(t, "Themes & screen", lambda e: app.go("appearance"), icon_name=ft.Icons.PALETTE_OUTLINED),
         c.nav_item(t, "Settings", lambda e: app.go("settings"), icon_name=ft.Icons.SETTINGS_OUTLINED),
+        c.nav_item(t, "About", lambda e: app.go("about"), icon_name=ft.Icons.INFO_OUTLINE),
         ft.Container(c.mono(f"v{app_version()} · GB/GBC core", t, size=11), padding=10),
     ]
     logo = ft.Row([
@@ -117,6 +118,7 @@ def build(app: "App") -> ft.Control:
             c.icon_button(ft.Icons.EMOJI_EVENTS_OUTLINED, lambda e: app.go("together"), t, "Achievements & link play"),
             c.icon_button(ft.Icons.PALETTE_OUTLINED, lambda e: app.go("appearance"), t, "Themes & screen"),
             c.icon_button(ft.Icons.SETTINGS_OUTLINED, lambda e: app.go("settings"), t, "Settings"),
+            c.icon_button(ft.Icons.INFO_OUTLINE, lambda e: app.go("about"), t, "About"),
         ], spacing=0, tight=True)
         side = c.sidebar(t, [ft.Row([ft.Container(logo, expand=True), links]), chips], wide=False, spacing=14)
 

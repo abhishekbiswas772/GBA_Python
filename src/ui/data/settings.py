@@ -129,6 +129,12 @@ class Settings:
     printer: bool = True
     webcam: bool = False
     rumble: bool = True
+    # player profile (set during onboarding; shown on save states and moments)
+    onboarded: bool = False
+    player_name: str = ""
+    player_tag: str = ""
+    avatar_color: str = "blue"
+    favorite_system: str = "GBA"
 
     @classmethod
     def path(cls) -> Path:
@@ -143,6 +149,7 @@ class Settings:
             return s
         if not isinstance(raw, dict):
             return s
+        s.onboarded = True              # settings from before onboarding existed: don't ask again
         for k, v in raw.items():
             if k == "keyboard":                         # legacy, migrated below
                 continue
@@ -182,6 +189,10 @@ class Settings:
                     keys = [k if isinstance(k, str) else "" for k in keys][:2]
                     out[sysname][b] = keys + [""] * (2 - len(keys))
         return out
+
+    @staticmethod
+    def default_rom_dirs() -> list[str]:
+        return list(Settings.__dataclass_fields__["rom_dirs"].default_factory())
 
     def save_folder(self) -> Path:
         """Folder battery saves go to (one subfolder per core, then per game)."""
