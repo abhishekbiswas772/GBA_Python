@@ -15,7 +15,8 @@ from pathlib import Path
 from src.ui.data.library import ago
 from src.ui.data.settings import data_dir
 
-KINDS = {".png": "SHOT", ".gif": "GIF", ".mp4": "CLIP", ".webm": "CLIP"}
+KINDS = {".png": "SHOT", ".gif": "GIF", ".mp4": "VIDEO", ".webm": "VIDEO"}
+CLIP_TAG = "clip"      # file name tag of a "clip the last 30 s" video
 
 
 def moments_dir() -> Path:
@@ -30,7 +31,7 @@ class Moment:
     title: str
     game: str
     system: str
-    kind: str        # SHOT | GIF | CLIP
+    kind: str        # SHOT | GIF | VIDEO (a recording) | CLIP (the last 30 s)
     created: float
 
     @property
@@ -39,7 +40,7 @@ class Moment:
 
     @property
     def length(self) -> str:
-        return {"SHOT": "PNG", "GIF": "GIF", "CLIP": "MP4"}.get(self.kind, self.kind)
+        return {"SHOT": "PNG", "GIF": "GIF", "VIDEO": "MP4", "CLIP": "MP4"}.get(self.kind, self.kind)
 
     @property
     def image(self) -> str | None:
@@ -59,8 +60,9 @@ def _safe(s: str) -> str:
     return re.sub(r"[^A-Za-z0-9 \-]+", "", s).strip()[:60] or "Game"
 
 
-def new_path(game: str, system: str, ext: str = ".png") -> Path:
-    return moments_dir() / f"{_safe(game)}__{system}__{int(time.time())}{ext}"
+def new_path(game: str, system: str, ext: str = ".png", tag: str = "") -> Path:
+    suffix = f"__{tag}" if tag else ""
+    return moments_dir() / f"{_safe(game)}__{system}__{int(time.time())}{suffix}{ext}"
 
 
 def list_moments() -> list[Moment]:
@@ -76,7 +78,9 @@ def list_moments() -> list[Moment]:
             created = float(parts[2]) if len(parts) > 2 else p.stat().st_mtime
         except ValueError:
             created = p.stat().st_mtime
-        label = {"SHOT": "Screenshot", "GIF": "GIF", "CLIP": "Video"}[kind]
+        if kind == "VIDEO" and len(parts) > 3 and parts[3] == CLIP_TAG:
+            kind = "CLIP"
+        label = {"SHOT": "Screenshot", "GIF": "GIF", "VIDEO": "Video", "CLIP": "Clip"}[kind]
         out.append(Moment(str(p), f"{label} · {time.strftime('%H:%M', time.localtime(created))}",
                           game, system, kind, created))
     return sorted(out, key=lambda m: -m.created)

@@ -14,13 +14,13 @@ if TYPE_CHECKING:
     from src.ui.app import App
 
 FILTERS = [("all", "All"), ("video", "Recordings & clips"), ("SHOT", "Screenshots")]
-VIDEO = ("CLIP", "GIF")
+VIDEO = ("VIDEO", "CLIP", "GIF")
 
 
 def _matches(m, f: str) -> bool:
     if f == "all":
         return True
-    if f in ("video", "GIF", "CLIP"):
+    if f in ("video", "GIF", "VIDEO", "CLIP"):
         return m.kind in VIDEO
     return m.kind == f
 
@@ -126,13 +126,13 @@ def _editor(app: "App", sel) -> list[ft.Control]:
     except OSError:
         size_kb = 0
     facts = ft.Row([c.mono(ext.upper(), t), c.mono(f"{size_kb:,.0f} KB", t),
-                    c.mono({"GIF": "animated, no sound", "CLIP": "H.264 + AAC sound"}.get(sel.kind, "still image"),
+                    c.mono({"GIF": "animated, no sound", "VIDEO": "H.264 + AAC sound", "CLIP": "H.264 + AAC sound"}.get(sel.kind, "still image"),
                            t)],
                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
     share = ft.Column([
         c.eyebrow("Share", t, size=12),
         ft.Row([c.button("Play", lambda e: app.open_folder(src), t, icon_name=ft.Icons.PLAY_ARROW, expand=1,
-                         h_pad=8) if sel.kind == "CLIP" else
+                         h_pad=8) if sel.kind in ("VIDEO", "CLIP") else
                 c.button("Copy to clipboard", copy_image, t, icon_name=ft.Icons.CONTENT_COPY, expand=1, h_pad=8),
                 c.button("Show in folder", lambda e: app.open_folder(src.parent), t,
                          icon_name=ft.Icons.FOLDER_OPEN, expand=1, h_pad=8)], spacing=8),

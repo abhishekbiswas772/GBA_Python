@@ -222,3 +222,19 @@ def test_ps1_has_save_states(app, monkeypatch):
     _walk(panel, set())
     app.go("library")
     assert len(page.dialogs) == 1 and app.route == "player"      # asks to save first
+
+
+def test_recordings_and_clips_are_labelled_apart(tmp_path, monkeypatch):
+    """A full recording is a VIDEO; only "clip the last 30 s" gets the CLIP badge."""
+    monkeypatch.setenv("FLET_APP_STORAGE_DATA", str(tmp_path))
+    from src.ui.data.moments import CLIP_TAG, list_moments, new_path
+    rec = new_path("Contra", "NES", ".mp4")
+    clip = new_path("Contra", "NES", ".mp4", CLIP_TAG)
+    gif = new_path("Contra", "NES", ".gif", CLIP_TAG)
+    for p in (rec, clip, gif):
+        p.write_bytes(b"x")
+    kinds = {m.path: (m.kind, m.title.split(" ·")[0]) for m in list_moments()}
+    assert kinds[str(rec)] == ("VIDEO", "Video")
+    assert kinds[str(clip)] == ("CLIP", "Clip")
+    assert kinds[str(gif)] == ("GIF", "GIF")
+    assert all(m.game == "Contra" and m.system == "NES" for m in list_moments())

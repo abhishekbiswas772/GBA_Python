@@ -23,7 +23,7 @@ from src.bridge import savestate
 from src.bridge.adaptors import GamepadAdaptor, InputRouter
 from src.bridge.runner import EmulatorRunner, Stats
 from src.ui.data.library import Game
-from src.ui.data.moments import new_path, poster_for
+from src.ui.data.moments import CLIP_TAG, new_path, poster_for
 from src.ui.data.settings import Settings, data_dir
 from src.ui.emulator import frame as fr
 from src.ui.theme import GB_PALETTES
@@ -332,9 +332,9 @@ class EmulatorSession:
     def record_ext(self) -> str:
         return ".gif" if self.settings.record_format == "gif" else ".mp4"
 
-    def _video_target(self) -> tuple:
+    def _video_target(self, tag: str = "") -> tuple:
         """(output path, encoder options) for the chosen format."""
-        path = new_path(self.game.title, self.game.system, self.record_ext)
+        path = new_path(self.game.title, self.game.system, self.record_ext, tag)
         transform = fr.lcd_correct if (self.game.system == "GBC" and self.settings.lcd_colors) else None
         opts = {"transform": transform}
         if path.suffix == ".mp4":
@@ -351,7 +351,7 @@ class EmulatorSession:
 
     def clip(self, seconds: float = 30, on_done=None) -> bool:
         """Save the last `seconds` of play (background), as MP4 or GIF."""
-        path, opts = self._video_target()
+        path, opts = self._video_target(CLIP_TAG)
         return self.runner.recorder.clip(path, seconds=seconds, on_done=on_done, **opts)
 
     def set_replay_buffer(self, on: bool) -> None:
