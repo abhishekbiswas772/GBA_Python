@@ -250,16 +250,16 @@ uv run python main.py run tests/roms/ps1/gp0-e1/gp0-e1.exe     # headless, print
 
 Without that step the rest of the app is unchanged. PS1 games show up in the library, and opening one says how to build the core.
 
-**What runs today: PS-X EXE programs** (`.exe` / `.psx` files starting with `PS-X EXE`) **and CD images** (`.cue` sheets with their `.bin` tracks, or `.iso`). Without a BIOS the HLE kernel boots a disc's `SYSTEM.CNF` program, which is enough for homebrew and test discs. Commercial games use far more of the BIOS than the HLE kernel covers, so the app asks for your own BIOS dump when you open one. Windows `.exe` files in a ROM folder are ignored, because only the PS-X header counts.
+**What runs today: PS-X EXE programs** (`.exe` / `.psx` files starting with `PS-X EXE`) **and CD images** (`.cue` sheets with their `.bin` tracks, or `.iso`). Without a BIOS the HLE kernel boots a disc's `SYSTEM.CNF` program, which is enough for homebrew and test discs. Commercial games use far more of the BIOS than the HLE kernel covers, so the app asks for your own BIOS dump when you open one. With a BIOS, commercial discs boot the way a console does (Crash Bandicoot reaches its title menu). Windows `.exe` files in a ROM folder are ignored, because only the PS-X header counts.
 
 | Part | Status |
 |---|---|
 | R3000A CPU: load and branch delay slots, COP0 exceptions, bus errors, cache isolation | ✅ |
-| Memory map, DMA (GPU, OTC, SPU, CD-ROM; block and linked list), IRQs, timers (system, dot and hblank clocks) | ✅ |
+| Memory map, DMA (GPU, OTC, SPU, CD-ROM; block and linked list), IRQs, timers (system, dot and hblank clocks), RAM / BIOS read timing | ✅ |
 | GPU: triangles and quads (flat, Gouraud, textured 4/8/15-bit with CLUT), lines, rectangles, fills, VRAM copies, blending, mask bit, dithering | ✅ |
 | Digital pad (SIO) | ✅ |
 | Boot without a BIOS: a small HLE kernel (exceptions, events, TTY, `printf`, pads) | ✅ runs every bundled test |
-| Boot with your own BIOS (**Settings → BIOS & firmware**), EXE sideloaded at the shell | ⚠️ implemented, not yet tested against a real BIOS |
+| Boot with your own BIOS (**Settings → BIOS & firmware**): discs, or an EXE sideloaded at the shell | ✅ SCPH-1001 boots Crash Bandicoot (USA) to its title menu. Other games untested. |
 | Save states, resume point and rewind | ✅ the Rust core serializes itself (serde + bincode, ~3.6 MB raw, ~90 KB compressed); replay after a load is bit-identical |
 | CD-ROM: `.cue` (multi-file, pregaps), `.iso`; ISO9660 + `SYSTEM.CNF` boot; all controller commands, data reads at 1×/2×, CD-DA audio, report mode | ✅ `cdrom/timing` inside the hardware ranges (acks, seeks, sector periods, pause). XA-ADPCM audio sectors are skipped for now. |
 | GTE (3D maths coprocessor): all 22 commands, 44-bit MACs, flags, UNR division | ✅ 1,100/1,100 hardware fuzz cases, `gte/test-all` 1150/1150 |
@@ -544,7 +544,7 @@ Push a tag like `v0.2.0` and GitHub Actions builds both apps and publishes them 
 ## 🧭 Honest limits
 
 - Cheats, achievements and link play are UI previews for now; the cores don't implement them yet.
-- The PS1 core is experimental. PS-X EXEs and homebrew discs run without a BIOS; commercial discs need a BIOS, and booting through a real BIOS is implemented but untested. XA-ADPCM (streamed CD audio) and memory cards aren't done yet. CI builds and tests it, and the release installers include it.
+- The PS1 core is experimental. PS-X EXEs and homebrew discs run without a BIOS; commercial discs need a BIOS (tested with SCPH-1001 and Crash Bandicoot; few games tried so far). XA-ADPCM (streamed CD audio) and memory cards aren't done yet. CI builds and tests it, and the release installers include it.
 - Sound uses SDL through pygame, so it works in the desktop app only.
 - The NES core is NTSC only. PAL and mappers beyond the ones listed above are welcome contributions.
 

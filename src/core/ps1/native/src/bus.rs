@@ -6,6 +6,9 @@ use crate::sio::Sio;
 use crate::spu::Spu;
 use crate::timers::Timers;
 
+/// CPU read timings in cycles (main RAM, BIOS ROM), after DuckStation's bus model.
+const RAM_READ_CYCLES: u32 = 6;
+const BIOS_READ_CYCLES: u32 = 22;
 pub const RAM_SIZE: usize = 2 * 1024 * 1024;
 pub const BIOS_SIZE: usize = 512 * 1024;
 const SPU_DMA_CYCLES_PER_WORD: u32 = 48;
@@ -112,6 +115,29 @@ impl Bus {
     #[inline(always)]
     pub fn take_stall(&mut self) -> u32 {
         std::mem::take(&mut self.stall)
+    }
+
+    /// Extra cycles (beyond the instruction's 1) a CPU data read at `addr` takes:
+    /// main RAM is ~6 cycles, the BIOS ROM's slow 8-bit bus ~22 (as DuckStation models).
+    #[inline(always)]
+    pub fn load_cost(&self, addr: u32) -> u32 {
+        match phys(addr) {
+            0x0000_0000..=0x007F_FFFF => RAM_READ_CYCLES - 1,
+            0x1FC0_0000..=0x1FC7_FFFF => BIOS_READ_CYCLES - 1,
+            _ => 0,
+        }
+    }
+
+    /// Extra cycles to fetch the instruction at `addr`: none from the instruction cache
+    /// (KUSEG/KSEG0 with the cache on), a full memory read otherwise.
+    #[inline(always)]
+    pub fn fetch_cost(&self, addr: u32) -> u32 {
+        let p = phys(addr);
+        if p >= 0x1FC0_0000 && p < 0x1FC8_0000 {
+            return BIOS_READ_CYCLES - 1;
+        }
+        let cached = addr < 0xA000_0000 && self.cache_ctrl & 0x800 != 0;
+        if !cached && p < 0x0080_0000 { RAM_READ_CYCLES - 1 } else { 0 }
     }
 
     // ------------------------------------------------------------ fast paths
@@ -357,8 +383,10 @@ impl Bus {
             }
             0x1F80_10F0 => self.dpcr = v,
             0x1F80_10F4 => {
+                // flags (24-30) are acked by writing 1; the master flag (31) is computed,
+                // and keeps its old value here so only a real 0 -> 1 change raises the IRQ
                 let flags = (self.dicr & 0x7F00_0000) & !(v & 0x7F00_0000);
-                self.dicr = flags | (v & 0x00FF_803F);
+                self.dicr = (self.dicr & 0x8000_0000) | flags | (v & 0x00FF_803F);
                 self.dma_update_irq();
             }
             0x1F80_1100..=0x1F80_112F => {
@@ -549,5 +577,39 @@ impl Bus {
             addr = next & 0x1F_FFFC;
         }
         self.collect_gpu_irq();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dicr_write_raises_dma_irq_only_on_a_new_edge() {
+        let mut b = Bus::new(Vec::new());
+        b.write32(0x1F80_10F4, 0x0084_0000); // master enable + channel 2 enable
+        b.dicr |= 1 << 26; // channel 2 finished
+        b.dma_update_irq();
+        assert_eq!(b.i_stat & irq::DMA, irq::DMA);
+        b.write32(0x1F80_1070, !irq::DMA); // the kernel acks I_STAT...
+        // ...then writes DICR without acking channel 2's flag (as the SCPH-1001 kernel does):
+        // the master flag stays set, so no new interrupt (this used to storm)
+        b.write32(0x1F80_10F4, 0x8884_0000);
+        assert_eq!(b.i_stat & irq::DMA, 0);
+        assert_ne!(b.dicr & (1 << 31), 0);
+        b.write32(0x1F80_10F4, 0x8484_0000); // ack channel 2: master drops
+        assert_eq!(b.dicr & (1 << 31), 0);
+    }
+
+    #[test]
+    fn cpu_reads_cost_memory_time() {
+        let mut b = Bus::new(Vec::new());
+        assert_eq!(b.load_cost(0x8000_1000), RAM_READ_CYCLES - 1);
+        assert_eq!(b.load_cost(0xBFC0_0000), BIOS_READ_CYCLES - 1);
+        assert_eq!(b.load_cost(0x1F80_0000), 0); // scratchpad: no wait
+        assert_eq!(b.fetch_cost(0xBFC0_0100), BIOS_READ_CYCLES - 1);
+        assert_eq!(b.fetch_cost(0xA001_0000), RAM_READ_CYCLES - 1); // KSEG1: uncached
+        b.cache_ctrl = 0x800;
+        assert_eq!(b.fetch_cost(0x8001_0000), 0); // KSEG0 with the I-cache on
     }
 }

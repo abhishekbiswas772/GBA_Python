@@ -191,6 +191,12 @@ mod python {
             self.sys.cpu.pc
         }
 
+        /// COP0 status and cause registers (debugging).
+        #[getter]
+        fn cop0(&self) -> (u32, u32, u32, u64) {
+            (self.sys.cpu.sr, self.sys.cpu.cause, self.sys.cpu.epc, self.sys.cpu.irqs_taken)
+        }
+
         #[getter]
         fn hle(&self) -> bool {
             self.sys.hle.is_some()

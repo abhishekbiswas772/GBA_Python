@@ -41,6 +41,8 @@ pub struct Cpu {
     pub sr: u32,
     pub cause: u32,
     pub epc: u32,
+    #[serde(skip)]
+    pub irqs_taken: u64,
     pub bad_vaddr: u32,
     pub cop0: [u32; 16],
     pub gte: Gte,
@@ -93,6 +95,7 @@ impl Cpu {
             sr: 0x0040_0000, // BEV: exception vectors in ROM
             cause: 0,
             epc: 0,
+            irqs_taken: 0,
             bad_vaddr: 0,
             cop0: [0; 16],
             gte: Gte::default(),
@@ -176,6 +179,7 @@ impl Cpu {
             self.branch = false;
             self.finish_pend();
             self.exception(Exc::Interrupt);
+            self.irqs_taken += 1;
             return 1;
         }
 
@@ -200,7 +204,7 @@ impl Cpu {
         };
         self.pc = self.next_pc;
         self.next_pc = self.pc.wrapping_add(4);
-        let cycles = self.execute(instr, bus);
+        let cycles = self.execute(instr, bus) + bus.fetch_cost(pc);
         self.finish_pend();
         cycles
     }
@@ -345,7 +349,7 @@ impl Cpu {
                 let a = self.reg(rs(i)).wrapping_add(imm_se(i));
                 let v = bus.read8(a) as i8 as i32 as u32;
                 self.delayed_load(rt(i), v);
-                return 1 + bus.take_stall();
+                return 1 + bus.take_stall() + bus.load_cost(a);
             }
             0x21 => {
                 let a = self.reg(rs(i)).wrapping_add(imm_se(i));
@@ -355,7 +359,7 @@ impl Cpu {
                     let v = bus.read16(a) as i16 as i32 as u32;
                     self.delayed_load(rt(i), v);
                 }
-                return 1 + bus.take_stall();
+                return 1 + bus.take_stall() + bus.load_cost(a);
             }
             0x22 => {
                 // LWL: merges with a load still in flight to rt
@@ -369,7 +373,7 @@ impl Cpu {
                     _ => w,
                 };
                 self.delayed_load(rt(i), v);
-                return 1 + bus.take_stall();
+                return 1 + bus.take_stall() + bus.load_cost(a);
             }
             0x23 => {
                 let a = self.reg(rs(i)).wrapping_add(imm_se(i));
@@ -379,13 +383,13 @@ impl Cpu {
                     let v = bus.read32(a);
                     self.delayed_load(rt(i), v);
                 }
-                return 1 + bus.take_stall();
+                return 1 + bus.take_stall() + bus.load_cost(a);
             }
             0x24 => {
                 let a = self.reg(rs(i)).wrapping_add(imm_se(i));
                 let v = bus.read8(a) as u32;
                 self.delayed_load(rt(i), v);
-                return 1 + bus.take_stall();
+                return 1 + bus.take_stall() + bus.load_cost(a);
             }
             0x25 => {
                 let a = self.reg(rs(i)).wrapping_add(imm_se(i));
@@ -395,7 +399,7 @@ impl Cpu {
                     let v = bus.read16(a) as u32;
                     self.delayed_load(rt(i), v);
                 }
-                return 1 + bus.take_stall();
+                return 1 + bus.take_stall() + bus.load_cost(a);
             }
             0x26 => {
                 let a = self.reg(rs(i)).wrapping_add(imm_se(i));
@@ -408,7 +412,7 @@ impl Cpu {
                     _ => (cur & 0xFFFF_FF00) | (w >> 24),
                 };
                 self.delayed_load(rt(i), v);
-                return 1 + bus.take_stall();
+                return 1 + bus.take_stall() + bus.load_cost(a);
             }
             0x28 => {
                 let a = self.reg(rs(i)).wrapping_add(imm_se(i));
