@@ -8,14 +8,14 @@ Material for announcing RetroPy (LinkedIn, release notes, social posts).
 | [`linkedin-post.md`](linkedin-post.md) | The launch post, with a long and a short version. |
 | [`../games.png`](../games.png) | One frame per console, for use as a static image or a link preview. |
 | [`../game-gb.gif`](../game-gb.gif), [`../game-gbc.gif`](../game-gbc.gif), [`../game-gba.gif`](../game-gba.gif), [`../game-nes.gif`](../game-nes.gif) | Looping clips, one per console. |
-| [`../ui-library.png`](../ui-library.png), [`../ui-player.png`](../ui-player.png), [`../ui-recording.png`](../ui-recording.png), [`../ui-settings.png`](../ui-settings.png), [`../ui-moments.png`](../ui-moments.png) | Screenshots of the desktop app (1920×1080 window). |
+| [`../ui-library.png`](../ui-library.png), [`../ui-player.png`](../ui-player.png), [`../ui-recording.png`](../ui-recording.png), [`../ui-settings.png`](../ui-settings.png), [`../ui-themes.png`](../ui-themes.png), [`../ui-moments.png`](../ui-moments.png) | Screenshots of the desktop app, captured from a maximised 1920×1200 window and scaled to 1600 px wide. |
 
 ## How it was made
 
 Every game frame is drawn by RetroPy's own cores. There is no capture from another emulator, and no frame is edited.
 
 1. **Game clips and the banner.** Run `uv run python docs/make_game_media.py`. It boots each ROM headlessly and feeds it a scripted list of button presses. Pokémon Red goes through New Game and Oak's speech, then walks out into Pallet Town. Contra starts stage 1 and runs and shoots. Zelda and FireRed play their intros by themselves. The script writes the GIFs and `games.png`. Battery saves go to a temporary folder. With `--state-dir DIR` it also writes the Pallet Town save state that appears in the player screenshot.
-2. **App screenshots.** These are the real Flet app, run with `FLET_APP_STORAGE_DATA` pointed at a throwaway folder, so no real settings, saves or history were touched. The library is the four games in `rom/`. Each window was captured with Win32 `PrintWindow`.
+2. **App screenshots.** These are the real Flet app, run with `FLET_APP_STORAGE_DATA` pointed at a throwaway folder, so no real settings, saves or history were touched. The library is the four games in `rom/`. The cover images are frames from step 1, put where the app keeps each game's "last frame". The play history in that folder (the "1 h 30 m played" and "10 h ago" lines) was filled in for the shot. The app was navigated by calling its own methods from inside the process (`app.play`, `session.save_state`, `start_recording`, `app.go`), because the capture session couldn't send mouse or keyboard input. Each window was captured with Win32 `PrintWindow`.
 3. **Video.** Run `uv run python docs/launch/make_demo_video.py`. It stitches the GIFs and screenshots with Pillow and encodes them with PyAV, which bundles FFmpeg.
 
 ## ROMs are not included

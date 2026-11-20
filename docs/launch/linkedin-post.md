@@ -5,11 +5,11 @@ post itself; LinkedIn shows a preview card for it.
 
 ---
 
-## Main version (~230 words)
+## Main version (~240 words)
 
-I've been building RetroPy, a retro console emulator, for a while now, and it's ready for people to try.
+I've been building RetroPy, a retro console emulator, and it's ready for people to try.
 
-It emulates the Game Boy, Game Boy Color, Game Boy Advance and NES, and all four are written in pure Python. There's no C extension and no native code. Python is slow, so most of the work went into making it fast enough: generated CPU interpreters, catch-up timing, cached scanline rendering, and frame pacing driven by the audio clock. Most cores run faster than real time on a laptop. The heavy GBA scenes need frameskip.
+It emulates the Game Boy, Game Boy Color, Game Boy Advance and NES, and all four cores are pure Python, with no C extension. Python is slow, so most of the work went into speed: generated CPU interpreters, catch-up timing, cached scanline rendering, and frame pacing driven by the audio clock. Most cores run faster than real time on a laptop; heavy GBA scenes need frameskip.
 
 On top of the cores there's a Flet desktop app:
 - a library with covers
@@ -35,7 +35,7 @@ https://github.com/abhishekbiswas772/RetroPy
 
 I wrote a Game Boy, Game Boy Color, GBA and NES emulator in pure Python. It's called RetroPy.
 
-It comes with a desktop app that has save states, rewind, MP4 recording and gamepad support, and CI builds a Windows installer and a .deb. There's also an experimental PS1 core in Rust, which matches real-hardware logs on all 1,100 GTE fuzz cases. PS1 games don't boot yet, because CD-ROM support is next.
+It comes with a desktop app that has save states, rewind, MP4 recording and gamepad support, and CI builds a Windows installer and a .deb. There's also an experimental PS1 core in Rust, which matches real-hardware logs on all 1,100 GTE fuzz cases. Commercial PS1 games don't boot yet, because CD-ROM support is next.
 
 The clips are from my own cartridges. Try it, and stars are welcome:
 https://github.com/abhishekbiswas772/RetroPy

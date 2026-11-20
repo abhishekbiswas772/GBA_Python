@@ -96,9 +96,11 @@ def label_bar(img: Image.Image, key: str, console: str, game: str) -> None:
     d.text((74, H - 72), console, font=font("Outfit-SemiBold.ttf", 32), fill=TEXT)
     cw = d.textlength(console, font=font("Outfit-SemiBold.ttf", 32))
     d.text((74 + cw + 18, H - 66), game, font=font("Outfit-Regular.ttf", 26), fill=MUTED)
-    tag = "pure Python core · real-time capture of the emulator's frames"
+    tag = "drawn by RetroPy's pure-Python core"
     tf = font("Outfit-Regular.ttf", 18)
-    d.text((W - 40 - d.textlength(tag, font=tf), H - 58), tag, font=tf, fill=MUTED)
+    gw = d.textlength(game, font=font("Outfit-Regular.ttf", 26))
+    if 74 + cw + 18 + gw + 40 < W - 40 - d.textlength(tag, font=tf):     # only when it fits
+        d.text((W - 40 - d.textlength(tag, font=tf), H - 58), tag, font=tf, fill=MUTED)
 
 
 def gif_frames(path: Path, windows) -> list[Image.Image]:

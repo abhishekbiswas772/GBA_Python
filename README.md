@@ -153,7 +153,7 @@ Prebuilt **Windows** and **Linux** apps are attached to every [release](https://
 ### Player
 
 <p align="center">
-  <img src="docs/ui-player.png" width="900" alt="The player running Pokémon Red in Pallet Town. The toolbar has pause, rewind, fast-forward, reset, screenshot, Record and Clip last 30s. The side panel shows save-state slots 1 and 2 with thumbnails, Save and Load buttons, 13 seconds of rewind available, the speed picker (1×, 2×, 4×, 8×), volume, the replay buffer toggle and Record as MP4 or GIF. The footer reads Running, 59 FPS, game 100%." />
+  <img src="docs/ui-player.png" width="900" alt="The player running Pokémon Red in Pallet Town. The toolbar has pause, rewind, fast-forward, reset, screenshot, Record and Clip last 30s. The side panel shows save-state slots 1 and 2 with thumbnails, Save and Load buttons, 29 seconds of rewind available, the speed picker (1×, 2×, 4×, 8×), volume, the replay buffer toggle and Record as MP4 or GIF. The footer reads Running, 59 FPS, game 100%." />
 </p>
 
 - **Toolbar:** pause, rewind, fast-forward, reset, screenshot, **Record** (shows a running timer while recording), **Clip last 30s**, fullscreen.
