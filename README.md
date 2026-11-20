@@ -6,14 +6,14 @@
 
 <p align="center">
   <b>Game Boy · Game Boy Color · Game Boy Advance · NES · PlayStation (experimental)</b><br/>
-  Four consoles emulated from scratch in pure Python, an experimental PS1 core in Rust, and a modern Flet desktop app on top.
+  Game Boy, Color and NES emulated from scratch in pure Python, GBA and an experimental PS1 core in Rust, and a modern Flet desktop app on top.
 </p>
 
 <p align="center">
   <a href="https://github.com/abhishekbiswas772/RetroPy/actions/workflows/ci.yml"><img src="https://github.com/abhishekbiswas772/RetroPy/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://github.com/abhishekbiswas772/RetroPy/actions/workflows/release.yml"><img src="https://github.com/abhishekbiswas772/RetroPy/actions/workflows/release.yml/badge.svg" alt="Release" /></a>
   <img src="https://img.shields.io/badge/python-3.13+-3776AB?logo=python&logoColor=white" alt="Python 3.13+" />
-  <img src="https://img.shields.io/badge/pure-python-FFD43B?logo=python&logoColor=black" alt="Pure Python" />
+  <img src="https://img.shields.io/badge/python-%2B%20rust-FFD43B?logo=python&logoColor=black" alt="Python and Rust" />
   <img src="https://img.shields.io/badge/platforms-windows%20%C2%B7%20linux-3D55D6" alt="Windows and Linux" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-F2A65A" alt="MIT license" /></a>
   <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-9FD356" alt="PRs welcome" /></a>
@@ -57,7 +57,8 @@
 
 ## ✨ Highlights
 
-- **Four cores, zero native code.** The Game Boy, Game Boy Color, GBA and NES are all written in Python, using only the standard library.
+- **Three cores in pure Python.** The Game Boy, Game Boy Color and NES are written in Python, using only the standard library.
+- **A GBA core in Rust, managed from Python.** The ARM7TDMI, PPU, APU, DMA, timers, HLE BIOS, saves and RTC run natively (PyO3); Python loads the game, writes the `.sav`, sets the clock and calls in once per frame. It was ported from the former Python core and checked against it instruction by instruction, and it runs about 45× faster. See [Game Boy Advance core](#-game-boy-advance-core).
 - **An experimental PlayStation core in Rust.** A 33.8 MHz MIPS CPU plus a software GPU is too much for an interpreter in Python, so the PS1 core is written in Rust and loaded through PyO3. It is optional: without Rust, everything else still works. See [PlayStation (experimental)](#-playstation-experimental).
 - **Accurate where it counts.** The cores pass the nestest trace line by line, blargg's CPU, APU, PPU and MMC3 suites, Acid2, and jsmolka's GBA tests.
 - **Smooth when Python is slow.** A worker thread paces itself on the audio clock. Auto-frameskip keeps the game and the sound at 100% when drawing can't keep up.
@@ -226,6 +227,20 @@ Screenshots (`F12`), recordings (`F10`) and clips (`F9`) collect here, newest fi
 | PlayStation: CD images (`.cue` / `.iso`) | 🧪 homebrew discs run without a BIOS; commercial discs need your BIOS |
 | PlayStation: memory cards | 🚧 next milestone |
 | Cheats, achievements, link play | 🚧 UI preview, not in the cores yet |
+
+---
+
+## 🎮 Game Boy Advance core
+
+The GBA core lives in [`src/core/gba/native`](src/core/gba/native), a Rust crate built as a Python
+extension with [PyO3](https://pyo3.rs). The emulation (one `Gba` machine whose CPU, bus, DMA, timers,
+PPU and APU call each other directly) is native; [`src/core/gba/__init__.py`](src/core/gba/__init__.py)
+does the management: loading the ROM, BIOS and `.sav`, autosaving every 600 frames, the RTC's
+local-time offset and save states. Build it once (needs [Rust](https://rustup.rs)):
+
+```bash
+uv run python -m src.core.gba.build      # copies _gba.pyd / _gba.so into src/core/gba/
+```
 
 ---
 
@@ -409,26 +424,25 @@ The features live in `src/bridge/savestate/`, `src/bridge/rewind/` and `src/brid
 
 ## ⚡ Speed
 
-Pure Python, measured with `docs/make_media.py` on a laptop. Results are in [`docs/benchmark.json`](docs/benchmark.json).
+GB, GBC and NES are pure Python, measured with `docs/make_media.py` on a laptop. Results are in [`docs/benchmark.json`](docs/benchmark.json).
 
 | Core | Frames/s, drawing every frame | Frames/s, frameskip | Real time |
 |---|---:|---:|---:|
 | Game Boy | ~104 | ~146 | **~170%** |
 | Game Boy Color | ~97 | ~144 | **~160%** |
-| Game Boy Advance, light scene | ~87 | ~90 | **~145%** |
 | NES | ~225 | ~262 | **~370%** |
 | NES, synthetic worst case | ~189 | ~296 | **~315%** |
 
 The NES worst case is a full screen of random tiles, 64 sprites, scrolling every frame, OAM DMA and a busy CPU.
 
-Heavy GBA scenes, with lots of blending plus Direct Sound, drop to about 50–60% drawn. Auto-frameskip then keeps the game and the audio at full speed and draws about 20–30 fps.
+The GBA core is native: `main.py run <Pokémon FireRed> --frames 2000` (headless, the intro and title screen) runs at **~1170%** of real speed, against 26% for the former Python core on the same machine. Every GBA scene runs at full speed with every frame drawn.
 
 ```mermaid
 xychart-beta
     title "Real-time speed (%), higher is better"
-    x-axis ["GB", "GBC", "GBA light", "NES", "NES worst case"]
+    x-axis ["GB", "GBC", "NES", "NES worst case"]
     y-axis "% of real hardware" 0 --> 400
-    bar [170, 160, 145, 370, 315]
+    bar [170, 160, 370, 315]
 ```
 
 ---
@@ -477,7 +491,8 @@ flowchart LR
 ```text
 main.py                  launcher and flet build entry
 src/core/gameboy/        DMG and CGB
-src/core/gba/            ARM, PPU, APU, DMA, timers, HLE BIOS, RTC
+src/core/gba/            GBA core: Python wrapper (saves, RTC clock, states) + build helper
+src/core/gba/native/     the Rust crate (ARM7TDMI, PPU, APU, DMA, timers, HLE BIOS, RTC)
 src/core/nes/            6502 CPU, PPU, APU, mappers, cartridge
 src/core/ps1/            experimental PS1 core: Python wrapper + build helper
 src/core/ps1/native/     the Rust crate (CPU, GPU, DMA, timers, pad, HLE kernel)

@@ -8,8 +8,17 @@ group's topmost line. OBJ mosaic (attribute 0 bit 12) is horizontal only.
 Scenes are driven headlessly: IO registers go through the bus, VRAM/palette
 are filled with known patterns and the PPU renders scanlines directly.
 """
-from src.core.gba.common import WIDTH
-from src.core.gba.gba import GBA
+import os
+
+import pytest
+
+from src.core import gba as gba_core
+
+if os.environ.get("GBA_CORE_REQUIRED") and not gba_core.AVAILABLE:
+    raise RuntimeError(f"GBA core required but not built: {gba_core.IMPORT_ERROR}")
+pytestmark = pytest.mark.skipif(not gba_core.AVAILABLE, reason="GBA core not built")
+
+from src.core.gba import WIDTH, GbaCore as GBA
 
 RED = 0x001F
 GREEN = 0x03E0

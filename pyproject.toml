@@ -26,7 +26,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 only-include = ["src", "main.py"]
-exclude = ["src/rom", "src/core/ps1/native"]
+exclude = ["src/rom", "src/core/ps1/native", "src/core/gba/native"]
 dev-mode-dirs = ["."]
 
 # pygame has no Android wheel. Desktop builds opt in below; `uv sync` still
@@ -46,7 +46,7 @@ splash_color = "#0F1115"
 
 [tool.flet.app]
 module = "main.py"
-exclude = ["tests", "rom", "src/rom", "docs", "packaging", "src/core/ps1/native/target"]
+exclude = ["tests", "rom", "src/rom", "docs", "packaging", "src/core/ps1/native/target", "src/core/gba/native/target"]
 
 [tool.flet.windows]
 dependencies = ["pygame>=2.6.1"]

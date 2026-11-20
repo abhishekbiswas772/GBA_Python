@@ -40,3 +40,7 @@ target/
 src/core/ps1/_ps1*.pyd
 src/core/ps1/_ps1*.so
 src/core/ps1/_ps1*.old.*
+
+src/core/gba/_gba*.pyd
+src/core/gba/_gba*.so
+src/core/gba/_gba*.old.*

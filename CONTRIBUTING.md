@@ -1,11 +1,11 @@
 # Contributing to RetroPy
 
-Thanks for wanting to help. This project emulates the Game Boy, Game Boy Color, Game Boy Advance and NES in pure Python. Every kind of contribution is welcome: bug reports, test-ROM results, speed-ups, new mappers, UI polish and docs.
+Thanks for wanting to help. This project emulates the Game Boy, Game Boy Color, Game Boy Advance and NES (GB, GBC and NES in pure Python; the GBA and the experimental PS1 in Rust, managed from Python). Every kind of contribution is welcome: bug reports, test-ROM results, speed-ups, new mappers, UI polish and docs.
 
 ## Ground rules
 
 - **No copyrighted ROMs or BIOS files.** Never commit, attach or link commercial games or a Nintendo BIOS. That covers issues and PRs too. The `rom/` folder is git-ignored for exactly this reason.
-- **Pure Python cores.** `src/core/` uses only the standard library. No C extensions, no NumPy in the hot paths. Speed comes from technique; see "Performance" below.
+- **Pure Python cores** (GB, GBC, NES). They use only the standard library. No C extensions, no NumPy in the hot paths. Speed comes from technique; see "Performance" below. The GBA and PS1 cores are Rust crates in `src/core/<core>/native/`; build them with `uv run python -m src.core.<core>.build`.
 - **Licence.** By contributing you agree that your work is released under the project's [MIT License](LICENSE).
 - **Be kind.** Assume good intent, keep reviews about the code, and help newcomers.
 

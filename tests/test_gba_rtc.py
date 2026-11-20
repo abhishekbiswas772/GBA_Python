@@ -1,10 +1,18 @@
 """Cartridge GPIO + S-3511 RTC, driven through the bus exactly like a game does."""
-import time
+import os
 
-from src.core.gba.gba import GBA
+import pytest
+
+from src.core import gba as gba_core
+
+if os.environ.get("GBA_CORE_REQUIRED") and not gba_core.AVAILABLE:
+    raise RuntimeError(f"GBA core required but not built: {gba_core.IMPORT_ERROR}")
+pytestmark = pytest.mark.skipif(not gba_core.AVAILABLE, reason="GBA core not built")
+
+from src.core.gba import GbaCore as GBA
 
 DATA, DIR, CTRL = 0x080000C4, 0x080000C6, 0x080000C8
-FIXED = time.struct_time((2024, 3, 5, 14, 7, 9, 1, 65, 0))     # Tue 2024-03-05 14:07:09
+FIXED = [2024, 3, 5, 1, 14, 7, 9]           # Tue 2024-03-05 14:07:09 (weekday Mon=0)
 
 
 def rtc_rom(sig: bool = True) -> bytes:
@@ -17,8 +25,8 @@ def rtc_rom(sig: bool = True) -> bytes:
 
 def make(sig: bool = True) -> GBA:
     g = GBA(rtc_rom(sig))
-    if g.cart.rtc is not None:
-        g.cart.rtc.clock = lambda: FIXED
+    if g.cart.rtc:
+        g.gba.set_rtc_fixed(FIXED)
     return g
 
 
@@ -55,8 +63,8 @@ def stop(bus):
 
 
 def test_rtc_detected_from_library_string():
-    assert make().cart.rtc is not None
-    assert make(sig=False).cart.rtc is None
+    assert make().cart.rtc
+    assert not make(sig=False).cart.rtc
 
 
 def test_datetime_read_bcd():

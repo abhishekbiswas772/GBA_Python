@@ -3,7 +3,7 @@ import time
 
 import pygame
 
-from src.core.gba.common import WIDTH, HEIGHT, CPU_HZ
+from src.core.gba import WIDTH, HEIGHT, CPU_HZ
 
 KEYMAP = {
     pygame.K_RIGHT: "right",
@@ -67,7 +67,7 @@ class Display:
 
     def run(self, max_frames=None) -> None:
         t0 = time.perf_counter()
-        c0 = self.gba.cpu.now
+        c0 = self.gba.now
         try:
             while self.running and (max_frames is None or self.frames < max_frames):
                 for event in pygame.event.get():
@@ -83,16 +83,12 @@ class Display:
                 # time, so run this frame without drawing (game + audio stay 100%)
                 draw = self._skipped >= 3 or not (self.audio and self.audio.started
                                                   and self.audio.queued() < self.audio.low)
-                self.gba.ppu.skip_render = not draw
-                try:
-                    self.gba.run_frame()
-                finally:
-                    self.gba.ppu.skip_render = False
+                self.gba.run_frame(render=draw)
                 if self.audio:
                     self.audio.pump()
                 if draw:
                     self._skipped = 0
-                    self.surface.get_buffer().write(bytes(self.gba.ppu.fb))   # proxy freed at once
+                    self.surface.get_buffer().write(self.gba.fb)   # proxy freed at once
                     pygame.transform.scale(self.surface.convert(), self.screen.get_size(), self.screen)
                     pygame.display.flip()
                 else:
@@ -101,7 +97,7 @@ class Display:
                 if self.frames % 30 == 0:
                     wall = time.perf_counter() - t0
                     if wall > 0:
-                        speed = (self.gba.cpu.now - c0) / wall / CPU_HZ * 100
+                        speed = (self.gba.now - c0) / wall / CPU_HZ * 100
                         pygame.display.set_caption(f"{self.title} - {speed:.0f}%")
                 if self.audio and self.audio.started:
                     self.audio.wait()

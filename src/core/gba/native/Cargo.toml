@@ -1,0 +1,27 @@
+[package]
+name = "gba"
+version = "0.1.0"
+edition = "2021"
+description = "Native Game Boy Advance core for RetroPy, exposed to Python with PyO3"
+license = "MIT"
+publish = false
+
+[lib]
+name = "_gba"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+bincode = "1.3"
+pyo3 = { version = "0.25", features = ["extension-module", "abi3-py313"], optional = true }
+
+[features]
+default = ["python"]
+python = ["dep:pyo3"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "unwind"
+debug = false

@@ -20,8 +20,7 @@ CASES = [
 def _state(m):
     core = m.core
     if m.system == "GBA":
-        return (bytes(core.ppu.fb), core.cpu.now, list(core.cpu.r), core.ppu.vcount,
-                list(core.ppu.ref_x), list(core.ppu.ref_y))
+        return (core.fb, core.now, list(core.cpu.r), core.gba.save_state())
     p = core.ppu
     return (m.frame_rgb(), core.total_cycles, core.cpu.pc, p.ly, p.win_y, p.win_active)
 
@@ -48,4 +47,3 @@ def test_skip_leaves_last_frame_on_screen():
     before = m.frame_rgb()
     m.run_frame(render=False)
     assert m.frame_rgb() == before
-    assert m.core.ppu.skip_render is False   # flag never leaks out of run_frame

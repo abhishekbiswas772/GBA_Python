@@ -1,4 +1,4 @@
-"""Check a `flet build` output folder: the app is there and the PS1 core (_ps1.pyd/.so) got bundled.
+"""Check a `flet build` output folder: the app is there and the native cores (_ps1 / _gba .pyd/.so) got bundled.
 
     python packaging/check_bundle.py <build output dir>
 
@@ -32,16 +32,16 @@ def main() -> int:
     if not root.is_dir():
         print(f"no build output at {root}")
         return 1
-    core = [h for h in find(root, "_ps1.") if h.endswith((".pyd", ".so")) and ".old." not in h]
     main_py = find(root, "main.py")
     print("main.py:", main_py[:3] or "MISSING")
-    print("PS1 core:", core or "MISSING")
-    if not main_py:
-        return 1
-    if not core:
-        print("::error::the PS1 core (_ps1.pyd / _ps1.so) is not in the bundle")
-        return 1
-    return 0
+    ok = bool(main_py)
+    for name, label in (("_ps1", "PS1"), ("_gba", "GBA")):
+        core = [h for h in find(root, name + ".") if h.endswith((".pyd", ".so")) and ".old." not in h]
+        print(f"{label} core:", core or "MISSING")
+        if not core:
+            print(f"::error::the {label} core ({name}.pyd / {name}.so) is not in the bundle")
+            ok = False
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

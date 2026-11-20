@@ -440,7 +440,7 @@ def _pad_status() -> str:
 # -------------------------------------------------------------------- BIOS
 def _bios(app: "App") -> list[ft.Control]:
     t, s = app.t, app.settings
-    from src.core import ps1
+    from src.core import gba, ps1
 
     async def pick(e) -> None:
         if app.is_web or app.is_mobile:
@@ -463,7 +463,10 @@ def _bios(app: "App") -> list[ft.Control]:
     return [
         ft.Column([c.heading("BIOS & firmware", t, 28),
                    c.text("Game Boy, Color, GBA and NES need no BIOS. The GBA uses a built-in HLE BIOS.",
-                          color=t.muted)], spacing=6),
+                          color=t.muted)]
+                  + ([] if gba.AVAILABLE else [c.text(
+                      "The GBA core isn't built yet: run  uv run python -m src.core.gba.build  (needs Rust).",
+                      size=13, color=t.muted)]), spacing=6),
         c.eyebrow("PlayStation (experimental)", t),
         c.text(core_line, size=13, color=t.text if ps1.AVAILABLE else t.muted),
         c.card(ft.Row([

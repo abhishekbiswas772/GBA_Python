@@ -31,6 +31,7 @@ jobs:
       PYGAME_HIDE_SUPPORT_PROMPT: "1"
       PYTHONUNBUFFERED: "1"
       PS1_CORE_REQUIRED: "1"
+      GBA_CORE_REQUIRED: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -49,6 +50,9 @@ jobs:
 
       - name: Build the PS1 core
         run: uv run python -m src.core.ps1.build
+
+      - name: Build the GBA core
+        run: uv run python -m src.core.gba.build
 
       - name: Unit tests and ROM tests
         run: |
@@ -91,7 +95,7 @@ jobs:
           echo "value=${v}" >> "$GITHUB_OUTPUT"
           echo "Version: ${v}"
 
-      # the PS1 core is a native extension: build it so `flet build` bundles it
+      # the PS1 and GBA cores are native extensions: build them so `flet build` bundles them
       - name: Setup uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
@@ -101,11 +105,12 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build the PS1 core
+      - name: Build the PS1 and GBA cores
         shell: bash
         run: |
           uv sync --frozen
           uv run python -m src.core.ps1.build
+          uv run python -m src.core.gba.build
 
       - name: Build app
         id: build

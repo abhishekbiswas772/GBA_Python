@@ -7,8 +7,17 @@ line samples the same texel (usually transparent), so the layer vanishes.
 The scene is synthetic: mode 1, affine BG2 with a 256x256 8-bit map, one
 256-colour tile placed at map cell (11, 2) like a small picture.
 """
-from src.core.gba.common import WIDTH
-from src.core.gba.gba import GBA
+import os
+
+import pytest
+
+from src.core import gba as gba_core
+
+if os.environ.get("GBA_CORE_REQUIRED") and not gba_core.AVAILABLE:
+    raise RuntimeError(f"GBA core required but not built: {gba_core.IMPORT_ERROR}")
+pytestmark = pytest.mark.skipif(not gba_core.AVAILABLE, reason="GBA core not built")
+
+from src.core.gba import WIDTH, GbaCore as GBA
 
 IO = 0x04000000
 RED = 0x001F
@@ -50,7 +59,7 @@ def test_affine_bg_visible_after_register_ram_reset():
     for i in range(64):                          # tile 0x18: solid colour 1
         bus.vram[0x18 * 64 + i] = 1
     bus.vram[0xE000 + 2 * 32 + 11] = 0x18        # map cell (11, 2) of a 32-tile-wide map
-    g.ppu._latch_ref(0)                          # as at the start of a frame
+    g.ppu.latch_ref(0)                          # as at the start of a frame
     for y in range(24):
         g.ppu.render_line(y)
     line = px_line(g, 18)                        # tile row 2

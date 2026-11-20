@@ -281,7 +281,12 @@ def load_file(machine, path) -> None:
     if meta.get("rom") and meta["rom"] != _rom_id(machine):
         raise ValueError("this state was saved from a different game")
     sampling = machine.apu.sampling
-    _adopt(machine, zlib.decompress(blob[len(MAGIC) + 4 + n:]), restricted=True)
+    try:
+        _adopt(machine, zlib.decompress(blob[len(MAGIC) + 4 + n:]), restricted=True)
+    except (ImportError, AttributeError) as e:
+        # e.g. a GBA state from the old pure-Python core, whose classes are gone
+        raise ValueError("this state was saved by an older version of the emulator core "
+                         f"and can't be loaded ({e})") from e
     _resume_audio(machine, sampling)
 
 

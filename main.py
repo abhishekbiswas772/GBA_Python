@@ -125,8 +125,10 @@ def cmd_info(args) -> None:
               + (f", {region}" if region else ""))
         return
     if system == "GBA":
-        from src.core.gba.cartridge import Cartridge
-    elif system == "NES":
+        from src.core.gba import GbaCore
+        print(f"[GBA] {GbaCore(rom).cart}")
+        return
+    if system == "NES":
         from src.core.nes.cartridge import Cartridge
     else:
         from src.core.gameboy.cartridge import Cartridge
@@ -173,9 +175,11 @@ def _play_gb(args, headless: bool) -> None:
 
 
 def _play_gba(args, headless: bool) -> None:
-    from src.core.gba.common import CPU_HZ
-    from src.core.gba.gba import GBA
-    gba = GBA(args.rom, bios=args.bios)
+    from src.core.gba import CPU_HZ, GbaCore
+    try:
+        gba = GbaCore(args.rom, bios=args.bios)
+    except RuntimeError as e:
+        sys.exit(f"error: {e}")
     print(gba.cart)
     t0 = time.time()
     try:
@@ -196,8 +200,8 @@ def _play_gba(args, headless: bool) -> None:
         if gba.save():
             print(f"[saved backup memory -> {gba.cart.sav_path.name}]")
     secs = time.time() - t0
-    print(f"{gba.ppu.frame:,} frames, {gba.cpu.now:,} cycles in {secs:.1f}s "
-          + _speed(gba.cpu.now, CPU_HZ, secs, "GBA"))
+    print(f"{gba.frame:,} frames, {gba.now:,} cycles in {secs:.1f}s "
+          + _speed(gba.now, CPU_HZ, secs, "GBA"))
 
 
 def _play_nes(args, headless: bool) -> None:

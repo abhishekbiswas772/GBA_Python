@@ -1,13 +1,18 @@
 """GBA core tests: jsmolka gba-tests ROMs (MIT, see tests/roms/gba/gba-tests-LICENSE.txt)
 plus unit checks of the HLE BIOS, saves and PPU. The ROM tests report the number of
 the first failed test in r12 once the CPU reaches its idle loop (0 = all passed)."""
+import os
 from pathlib import Path
 
 import pytest
 
-from src.core.gba.cartridge import EEPROM, Flash, detect_save
-from src.core.gba.common import SAVE_EEPROM, SAVE_FLASH128, SAVE_SRAM, WIDTH, HEIGHT
-from src.core.gba.gba import GBA
+from src.core import gba as gba_core
+
+if os.environ.get("GBA_CORE_REQUIRED") and not gba_core.AVAILABLE:
+    raise RuntimeError(f"GBA core required but not built: {gba_core.IMPORT_ERROR}")
+pytestmark = pytest.mark.skipif(not gba_core.AVAILABLE, reason="GBA core not built")
+
+from src.core.gba import HEIGHT, WIDTH, GbaCore as GBA
 
 ROMS = Path(__file__).parent / "roms" / "gba"
 COMMERCIAL = Path(__file__).parent.parent / "rom" / "gba"
@@ -115,51 +120,23 @@ def test_vblank_intr_wait_halts_until_irq():
 
 
 # ------------------------------------------------------------------ saves
-def test_save_detection():
-    assert detect_save(b"\x00" * 64 + b"EEPROM_V124") == SAVE_EEPROM
-    assert detect_save(b"FLASH1M_V103") == SAVE_FLASH128
-    assert detect_save(b"SRAM_V113") == SAVE_SRAM
+# Save-type detection, EEPROM and Flash are unit-tested in Rust: `cargo test` in
+# src/core/gba/native (src/cart.rs).
+def test_save_kind_detected():
+    assert GBA((ROMS / "flash128.gba").read_bytes()).cart.save_kind == "flash128"
+    assert GBA((ROMS / "sram.gba").read_bytes()).cart.save_kind == "sram"
+    assert GBA((ROMS / "none.gba").read_bytes()).cart.save_kind == "none"
 
 
-def _eeprom_bits(bits):
-    return [int(c) for c in bits]
-
-
-def test_eeprom_write_then_read_large():
-    e = EEPROM()
-    addr = format(5, "014b")
-    payload = "".join(format(b, "08b") for b in b"ZELDA!MC")
-    req = _eeprom_bits("10" + addr + payload + "0")
-    e.begin(len(req))
-    for bit in req:
-        e.write_bit(bit)
-    assert e.size == 0x2000 and e.dirty
-    req = _eeprom_bits("11" + addr + "0")
-    e.begin(len(req))
-    for bit in req:
-        e.write_bit(bit)
-    out = [e.read_bit() for _ in range(68)]
-    assert out[:4] == [0, 0, 0, 0]
-    data = bytes(int("".join(map(str, out[4 + 8 * k: 12 + 8 * k])), 2) for k in range(8))
-    assert data == b"ZELDA!MC"
-
-
-def test_flash_id_erase_and_bank_switch():
-    f = Flash(0x20000)
-    cmd = lambda v: (f.write8(0x5555, 0xAA), f.write8(0x2AAA, 0x55), f.write8(0x5555, v))
-    cmd(0x90)
-    assert (f.read8(0), f.read8(1)) == (0x62, 0x13)
-    cmd(0xF0)
-    cmd(0xA0)
-    f.write8(0x1234, 0x5A)
-    assert f.read8(0x1234) == 0x5A
-    cmd(0xB0)
-    f.write8(0x0000, 1)
-    assert f.read8(0x1234) == 0xFF               # bank 1 still erased
-    cmd(0x80)
-    cmd(0x10)                                    # chip erase
-    f.bank = 0
-    assert f.read8(0x1234) == 0xFF
+def test_sav_file_written_and_reloaded(tmp_path):
+    rom = tmp_path / "sram.gba"
+    rom.write_bytes((ROMS / "sram.gba").read_bytes())
+    g = GBA(rom)
+    g.run_frames(30)                              # the test ROM writes SRAM
+    assert g.save() and g.cart.sav_path.exists()
+    data = g.cart.sav_path.read_bytes()
+    assert len(data) == 0x8000 and data != b"\xff" * 0x8000
+    assert GBA(rom).gba.save_data() == data       # loaded back into a new session
 
 
 # ------------------------------------------------------------------ commercial ROM smoke test
@@ -172,5 +149,5 @@ def test_minish_cap_boots(tmp_path):
     copy.write_bytes(rom.read_bytes())
     gba = GBA(copy)
     gba.run_frames(400)
-    assert gba.ppu.frame == 400
+    assert gba.frame == 400
     assert _text_rows(gba) > 100                  # a full picture, not a blank screen

@@ -1,6 +1,7 @@
 """Save states, rewind and recording (src/bridge/savestate, rewind, recorder)."""
 import hashlib
 import io
+import os
 import pickle
 import time
 from pathlib import Path
@@ -10,6 +11,7 @@ import pytest
 from src.bridge import EmulatorRunner, load, savestate
 from src.bridge.recorder import Recorder, encode_gif
 from src.bridge.rewind import RewindBuffer
+from src.core import gba as gba_core
 
 ROMS = Path(__file__).parent / "roms"
 GAMES = [
@@ -26,6 +28,8 @@ GAMES = [
 def _machine(path):
     if not path.exists():
         pytest.skip(f"missing {path.name}")
+    if path.suffix == ".gba" and not gba_core.AVAILABLE and not os.environ.get("GBA_CORE_REQUIRED"):
+        pytest.skip("GBA core not built")
     m = load(path)
     m.core.cart.save_ram = lambda *a, **k: False       # never touch a real .sav
     m.apu.sampling = True
@@ -75,7 +79,11 @@ def test_state_keeps_rom_out_of_the_file(tmp_path):
     m = _machine(ROMS / "gba" / "stripes.gba")
     f = tmp_path / "s.state"
     savestate.save_file(m, f)
-    assert f.stat().st_size < len(m.core.bus.rom) // 4
+    import zlib
+    blob = f.read_bytes()
+    n = int.from_bytes(blob[len(savestate.MAGIC):len(savestate.MAGIC) + 4], "little")
+    raw = zlib.decompress(blob[len(savestate.MAGIC) + 4 + n:])
+    assert m.core.rom not in raw and f.stat().st_size < 256 * 1024
 
 
 def test_wrong_game_is_rejected(tmp_path):
@@ -296,10 +304,9 @@ def test_runner_submit_save_load_and_rewind(tmp_path):
     assert r.submit(lambda m: 1).exception(5) is not None      # stopped: fails, never hangs
 
 
-def test_loaded_gba_state_keeps_working_handlers(tmp_path):
-    """Bus handlers are closures a state can't hold (they pickle as KEEP). Loading a file
-    into a new session must leave the live, working handlers in place: FireRed crashed on
-    its first write after a load when they were replaced by the placeholder."""
+def test_loaded_gba_state_keeps_working_memory(tmp_path):
+    """Loading a file into a new session leaves a machine that still runs and writes
+    every RAM region (FireRed once crashed on its first write after a load)."""
     m = _machine(ROMS / "gba" / "stripes.gba")
     m.run_frames(30)
     f = tmp_path / "s.state"
@@ -307,9 +314,21 @@ def test_loaded_gba_state_keeps_working_handlers(tmp_path):
     fresh = _machine(ROMS / "gba" / "stripes.gba")
     savestate.load_file(fresh, f)
     bus = fresh.core.bus
-    tables = [bus.R8, bus.R16, bus.R32, bus.W8, bus.W16, bus.W32,
-              list(bus.io_read.values()), list(bus.io_write.values())]
-    assert not [h for t in tables for h in t if h is savestate.KEEP]
     for a in (0x02000000, 0x03000000, 0x05000000, 0x06000000):   # every RAM region still writes
         bus.write16(a, 0x1234)
         assert bus.read16(a) == 0x1234
+    fresh.run_frames(5)
+
+
+def test_old_python_gba_state_is_refused(tmp_path):
+    """States from the old pure-Python GBA core name classes that no longer exist."""
+    import json
+    import zlib
+    m = _machine(ROMS / "gba" / "stripes.gba")
+    meta = {"version": savestate.VERSION, "system": "GBA", "rom": savestate._rom_id(m)}
+    raw = pickle.dumps(None).replace(b"N.", b"csrc.core.gba.gba\nGBA\n.")
+    head = json.dumps(meta).encode()
+    f = tmp_path / "old.state"
+    f.write_bytes(savestate.MAGIC + len(head).to_bytes(4, "little") + head + zlib.compress(raw))
+    with pytest.raises(ValueError, match="older version"):
+        savestate.load_file(m, f)
